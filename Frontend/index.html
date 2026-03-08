@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<title>Stock Insight</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="style.css">
+
+</head>
+<body>
+
+<div class="container">
+
+<h1>📈 Stock Insight</h1>
+
+<div class="search-box">
+    <input id="ticker" placeholder="Enter stock ticker (AAPL)">
+    <button onclick="getStock()">Analyze</button>
+</div>
+
+<div class="card">
+    <h3>Stock Price Chart</h3>
+    <canvas id="stockChart"></canvas>
+</div>
+
+<h2 id="stockName"></h2>
+
+<p id="price"></p>
+<p id="sentiment"></p>
+
+<h3>Latest News</h3>
+
+<ul id="newsList"></ul>
+
+</div>
+
+</div>
+
+<script src="script.js"></script>
+
+</body>
+</html>

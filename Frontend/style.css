@@ -1,0 +1,47 @@
+body{
+    font-family: Arial;
+    background-color:#111;
+    color:white;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    height:100vh;
+}
+
+.container{
+    width:400px;
+}
+
+h1{
+    text-align:center;
+}
+
+.search-box{
+    display:flex;
+    gap:10px;
+    margin-bottom:20px;
+}
+
+input{
+    flex:1;
+    padding:10px;
+    font-size:16px;
+}
+
+button{
+    padding:10px;
+    background:#00c853;
+    border:none;
+    color:white;
+    cursor:pointer;
+}
+
+.card{
+    background:#1e1e1e;
+    padding:20px;
+    border-radius:10px;
+}
+
+ul{
+    padding-left:20px;
+}
