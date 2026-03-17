@@ -1,5 +1,5 @@
+let chart; // global chart variable
 
-//mock data
 function getStock(){
 
 const ticker = document.getElementById("ticker").value.toUpperCase()
@@ -13,52 +13,59 @@ const data = {
         "iPhone demand increases",
         "Investors bullish on Apple"
     ],
-    prices:[170,172,168,175,178,180,182]
+    prices:[120,180,140,100,185]
 }
 
-document.getElementById("stockName").innerText = data.ticker
-document.getElementById("price").innerText = "Price: " + data.price
-document.getElementById("sentiment").innerText = "Sentiment: " + data.sentiment
+// UPDATE PRICE
+document.getElementById("price").innerText = "Current Price: " + data.price
 
 
-// NEWS
+// NEWS (cards instead of bullets)
 const newsList = document.getElementById("newsList")
 newsList.innerHTML = ""
 
 data.news.forEach(article=>{
 
-    const li = document.createElement("li")
-    li.innerText = article
-    newsList.appendChild(li)
+    const div = document.createElement("div")
+    div.className = "newsCard"
+    div.innerText = article
+
+    newsList.appendChild(div)
 
 })
 
 
 // CHART
+
 const ctx = document.getElementById('stockChart').getContext('2d')
 
-new Chart(ctx, {
+// destroy old chart before creating new one
+if(chart){
+    chart.destroy()
+}
+
+chart = new Chart(ctx, {
     type: 'line',
     data: {
-        labels: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
+        labels: ['Jan','Feb','Mar','Apr','May'],
         datasets: [{
             label: ticker + " Price",
             data: data.prices,
-            borderColor: "#00ff88",
-            backgroundColor: "rgba(0,255,136,0.1)",
-            tension:0.4
+            borderColor: "#4f46e5",
+            backgroundColor: "rgba(79,70,229,0.15)",
+            tension: 0.4,
+            fill: true,
+            pointRadius: 4
         }]
     },
     options:{
         responsive:true,
         plugins:{
-            legend:{
-                labels:{color:"white"}
-            }
+            legend:{display:false}
         },
         scales:{
-            x:{ticks:{color:"white"}},
-            y:{ticks:{color:"white"}}
+            x:{grid:{display:false}},
+            y:{grid:{color:"#e5e7eb"}}
         }
     }
 })

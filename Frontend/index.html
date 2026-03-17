@@ -12,30 +12,54 @@
 <link rel="stylesheet" href="style.css">
 
 </head>
+
 <body>
+
+<!-- NAVBAR -->
+<nav class="navbar">
+    <h2>📊 Finance Insights</h2>
+</nav>
 
 <div class="container">
 
-<h1>📈 Stock Insight</h1>
+<h1>Stock Dashboard</h1>
 
+<!-- SEARCH -->
 <div class="search-box">
-    <input id="ticker" placeholder="Enter stock ticker (AAPL)">
-    <button onclick="getStock()">Analyze</button>
+    <input id="ticker" placeholder="Name of stock (AAPL)">
+    <button onclick="getStock()">Search</button>
 </div>
 
+<!-- CHART -->
 <div class="card">
-    <h3>Stock Price Chart</h3>
+    <h3>Stock Price</h3>
     <canvas id="stockChart"></canvas>
 </div>
 
-<h2 id="stockName"></h2>
+<!-- GRID SECTION -->
+<div class="info-grid">
 
-<p id="price"></p>
-<p id="sentiment"></p>
+    <!-- OVERVIEW -->
+    <div class="info-card">
+        <h3>Overview</h3>
+        <p id="price"></p>
+        <p>Market Cap: $13.3B</p>
+        <p>P/E Ratio: 13.5</p>
+    </div>
 
-<h3>Latest News</h3>
+    <!-- NEWS -->
+    <div class="info-card">
+        <h3>Latest News</h3>
+        <div id="newsList"></div>
+    </div>
 
-<ul id="newsList"></ul>
+    <!-- TECH -->
+    <div class="info-card">
+        <h3>Technical Indicators</h3>
+        <p>Low: $1.95</p>
+        <p>High: $18.20</p>
+        <p style="color:green;">Trend: Positive</p>
+    </div>
 
 </div>
 
