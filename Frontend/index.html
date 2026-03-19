@@ -3,11 +3,13 @@
 
 <head>
 
-<title>Stock Insight</title>
+<meta charset="UTF-8">
+
+<title>Finance Insights</title>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
 <link rel="stylesheet" href="style.css">
 
@@ -15,50 +17,110 @@
 
 <body>
 
-<!-- NAVBAR -->
-<nav class="navbar">
-    <h2>📊 Finance Insights</h2>
+<!-- TOP NAV -->
+<nav class="topnav">
+    <div class="topnav-links">
+        <a href="#" class="nav-link active">Home</a>
+        <a href="#" class="nav-link">Markets</a>
+        <a href="#" class="nav-link">Research</a>
+        <a href="#" class="nav-link">Portfolio</a>
+    </div>
 </nav>
 
 <div class="container">
 
-<h1>Stock Dashboard</h1>
+<!-- MAIN CARD -->
+<div class="main-card">
 
-<!-- SEARCH -->
-<div class="search-box">
-    <input id="ticker" placeholder="Name of stock (AAPL)">
-    <button onclick="getStock()">Search</button>
+    <!-- HEADER ROW: Logo + Search -->
+    <div class="header-row">
+        <div class="logo">
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                <rect x="2" y="18" width="6" height="12" rx="1" fill="#2563eb"/>
+                <rect x="11" y="10" width="6" height="20" rx="1" fill="#2563eb"/>
+                <rect x="20" y="4" width="6" height="26" rx="1" fill="#93c5fd"/>
+            </svg>
+            <div class="logo-text">
+                <span class="logo-top">FINANCE</span>
+                <span class="logo-bottom">INSIGHTS</span>
+            </div>
+        </div>
+        <div class="search-box">
+            <div class="search-input-wrap">
+                <input id="ticker" placeholder="Name of stock">
+                <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                </svg>
+            </div>
+            <button onclick="getStock()">Search</button>
+        </div>
+    </div>
+
+    <!-- CHART -->
+    <div class="chart-wrap">
+        <canvas id="stockChart"></canvas>
+    </div>
+
 </div>
 
-<!-- CHART -->
-<div class="card">
-    <h3>Stock Price</h3>
-    <canvas id="stockChart"></canvas>
-</div>
-
-<!-- GRID SECTION -->
+<!-- INFO GRID -->
 <div class="info-grid">
 
     <!-- OVERVIEW -->
     <div class="info-card">
         <h3>Overview</h3>
-        <p id="price"></p>
-        <p>Market Cap: $13.3B</p>
-        <p>P/E Ratio: 13.5</p>
+        <div class="info-row">
+            <span class="info-label">Current Price</span>
+            <span class="info-value" id="price">—</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Market Cap</span>
+            <span class="info-value">$13.3B</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">P/E Ratio</span>
+            <span class="info-value">13.50</span>
+        </div>
     </div>
 
     <!-- NEWS -->
     <div class="info-card">
-        <h3>Latest News</h3>
-        <div id="newsList"></div>
+        <div class="news-header">
+            <h3>Latest News</h3>
+            <a href="#" class="see-all">See all</a>
+        </div>
+        <div id="newsList">
+            <div class="newsCard">
+                <p class="news-title">New Goran headlines hinting the break of the UK market trends</p>
+                <p class="news-date">Dec 28, 2022</p>
+            </div>
+            <div class="newsCard">
+                <p class="news-title">NEB reuninien deartson ouids ressuen importing chorts in fiamountesting.</p>
+                <p class="news-date">Nov 27, 2023</p>
+            </div>
+        </div>
     </div>
 
-    <!-- TECH -->
+    <!-- TECH INDICATORS -->
     <div class="info-card">
         <h3>Technical Indicators</h3>
-        <p>Low: $1.95</p>
-        <p>High: $18.20</p>
-        <p style="color:green;">Trend: Positive</p>
+        <div class="info-row">
+            <span class="info-label">Low</span>
+            <span class="info-value">$1.95</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">High</span>
+            <span class="info-value">$1.95</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Coin Fact</span>
+            <span class="info-value negative">-2.38</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">High Canillity</span>
+            <span class="info-value positive">18.20</span>
+        </div>
+        <button class="load-more">Load more</button>
     </div>
 
 </div>
