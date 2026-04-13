@@ -1,0 +1,261 @@
+*{
+    box-sizing:border-box;
+}
+
+body{
+    font-family: 'Inter', sans-serif;
+    background:#e8edf4;
+    margin:0;
+    color:#1e293b;
+}
+
+/* TOP NAV */
+.topnav{
+    background:white;
+    display:flex;
+    justify-content:center;
+    padding:0 40px;
+    box-shadow:0 1px 3px rgba(0,0,0,0.06);
+}
+
+.topnav-links{
+    display:flex;
+    gap:40px;
+}
+
+.nav-link{
+    text-decoration:none;
+    color:#94a3b8;
+    font-size:14px;
+    font-weight:500;
+    padding:18px 0;
+    border-bottom:2px solid transparent;
+}
+
+.nav-link.active{
+    color:#1e293b;
+    border-bottom:2px solid #1e293b;
+    font-weight:600;
+}
+
+/* CONTAINER */
+.container{
+    max-width:900px;
+    margin:32px auto;
+    padding:0 20px;
+}
+
+/* MAIN CARD */
+.main-card{
+    background:white;
+    border-radius:16px;
+    box-shadow:0 4px 20px rgba(0,0,0,0.07);
+    padding:28px;
+    margin-bottom:20px;
+}
+
+/* HEADER ROW */
+.header-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:24px;
+}
+
+/* LOGO */
+.logo{
+    display:flex;
+    align-items:center;
+    gap:10px;
+}
+
+.logo-text{
+    display:flex;
+    flex-direction:column;
+    line-height:1.1;
+}
+
+.logo-top{
+    font-size:15px;
+    font-weight:700;
+    color:#1e293b;
+    letter-spacing:0.05em;
+}
+
+.logo-bottom{
+    font-size:12px;
+    font-weight:500;
+    color:#64748b;
+    letter-spacing:0.08em;
+}
+
+/* SEARCH */
+.search-box{
+    display:flex;
+    gap:10px;
+    align-items:center;
+}
+
+.search-input-wrap{
+    position:relative;
+}
+
+.search-input-wrap input{
+    padding:10px 36px 10px 14px;
+    border-radius:8px;
+    border:1px solid #e2e8f0;
+    font-size:14px;
+    color:#1e293b;
+    width:220px;
+    outline:none;
+    font-family:'Inter',sans-serif;
+}
+
+.search-input-wrap input:focus{
+    border-color:#93c5fd;
+}
+
+.search-icon{
+    position:absolute;
+    right:10px;
+    top:50%;
+    transform:translateY(-50%);
+    pointer-events:none;
+}
+
+button{
+    padding:10px 20px;
+    background:#2563eb;
+    color:white;
+    border:none;
+    border-radius:8px;
+    cursor:pointer;
+    font-size:14px;
+    font-weight:500;
+    font-family:'Inter',sans-serif;
+    transition:background 0.15s;
+}
+
+button:hover{
+    background:#1d4ed8;
+}
+
+/* CHART */
+.chart-wrap{
+    width:100%;
+}
+
+/* INFO GRID */
+.info-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr 1fr;
+    gap:16px;
+}
+
+.info-card{
+    background:white;
+    padding:24px;
+    border-radius:16px;
+    box-shadow:0 4px 20px rgba(0,0,0,0.07);
+}
+
+h3{
+    margin:0 0 16px 0;
+    font-size:15px;
+    font-weight:600;
+    color:#1e293b;
+}
+
+/* OVERVIEW ROWS */
+.info-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:8px 0;
+    border-bottom:1px solid #f1f5f9;
+}
+
+.info-row:last-of-type{
+    border-bottom:none;
+}
+
+.info-label{
+    font-size:13px;
+    color:#94a3b8;
+}
+
+.info-value{
+    font-size:13px;
+    font-weight:600;
+    color:#1e293b;
+}
+
+.info-value.positive{
+    color:#16a34a;
+}
+
+.info-value.negative{
+    color:#dc2626;
+}
+
+/* NEWS */
+.news-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:16px;
+}
+
+.news-header h3{
+    margin:0;
+}
+
+.see-all{
+    font-size:13px;
+    color:#2563eb;
+    text-decoration:none;
+    font-weight:500;
+}
+
+.newsCard{
+    margin-bottom:14px;
+    padding-bottom:14px;
+    border-bottom:1px solid #f1f5f9;
+}
+
+.newsCard:last-child{
+    border-bottom:none;
+    margin-bottom:0;
+    padding-bottom:0;
+}
+
+.news-title{
+    margin:0 0 4px 0;
+    font-size:13px;
+    color:#1e293b;
+    line-height:1.4;
+}
+
+.news-date{
+    margin:0;
+    font-size:12px;
+    color:#94a3b8;
+}
+
+/* LOAD MORE */
+.load-more{
+    width:100%;
+    margin-top:16px;
+    background:#f8fafc;
+    color:#475569;
+    border:1px solid #e2e8f0;
+    font-weight:500;
+}
+
+.load-more:hover{
+    background:#f1f5f9;
+}
+
+p{
+    margin:8px 0;
+}
