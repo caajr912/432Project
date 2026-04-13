@@ -1,0 +1,22 @@
+{
+  "name": "432project-main",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "node server.js",
+    "dev:static": "serve 432Project-main/Frontend -l 3000",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0"
+  },
+  "devDependencies": {
+    "serve": "^14.2.6"
+  }
+}

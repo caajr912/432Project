@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<meta charset="UTF-8">
+
+<title>Finance Insights</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="style.css">
+
+</head>
+
+<body>
+
+<!-- TOP NAV -->
+<nav class="topnav">
+    <div class="topnav-links">
+        <a href="#" class="nav-link active">Home</a>
+        <a href="#" class="nav-link">Markets</a>
+        <a href="#" class="nav-link">Research</a>
+        <a href="#" class="nav-link">Portfolio</a>
+    </div>
+</nav>
+
+<div class="container">
+
+<!-- MAIN CARD -->
+<div class="main-card">
+
+    <!-- HEADER ROW: Logo + Search -->
+    <div class="header-row">
+        <div class="logo">
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                <rect x="2" y="18" width="6" height="12" rx="1" fill="#2563eb"/>
+                <rect x="11" y="10" width="6" height="20" rx="1" fill="#2563eb"/>
+                <rect x="20" y="4" width="6" height="26" rx="1" fill="#93c5fd"/>
+            </svg>
+            <div class="logo-text">
+                <span class="logo-top">FINANCE</span>
+                <span class="logo-bottom">INSIGHTS</span>
+            </div>
+        </div>
+        <div class="search-box">
+            <select id="tickerSelect" class="ticker-select" aria-label="Pick a stock" onchange="onTickerSelect()">
+                <option value="">Pick a stock…</option>
+                <option value="AAPL">Apple (AAPL)</option>
+                <option value="MSFT">Microsoft (MSFT)</option>
+                <option value="GOOGL">Alphabet (GOOGL)</option>
+                <option value="AMZN">Amazon (AMZN)</option>
+                <option value="META">Meta (META)</option>
+                <option value="NVDA">NVIDIA (NVDA)</option>
+                <option value="TSLA">Tesla (TSLA)</option>
+                <option value="JPM">JPMorgan (JPM)</option>
+                <option value="V">Visa (V)</option>
+                <option value="JNJ">Johnson &amp; Johnson (JNJ)</option>
+                <option value="WMT">Walmart (WMT)</option>
+                <option value="PG">Procter &amp; Gamble (PG)</option>
+                <option value="MA">Mastercard (MA)</option>
+                <option value="UNH">UnitedHealth (UNH)</option>
+                <option value="HD">Home Depot (HD)</option>
+                <option value="DIS">Disney (DIS)</option>
+                <option value="BAC">Bank of America (BAC)</option>
+                <option value="XOM">Exxon Mobil (XOM)</option>
+                <option value="PFE">Pfizer (PFE)</option>
+                <option value="KO">Coca-Cola (KO)</option>
+                <option value="NFLX">Netflix (NFLX)</option>
+            </select>
+            <div class="search-input-wrap">
+                <input id="ticker" placeholder="Or type a symbol" autocomplete="off">
+                <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                </svg>
+            </div>
+            <button type="button" onclick="getStock()">Search</button>
+        </div>
+    </div>
+
+    <div class="chart-toolbar">
+        <p class="chart-subtitle" id="weekChartSubtitle">High (green), low (red), trend = average of both (blue) — pick a range (search a symbol)</p>
+        <div class="chart-range-toggle" role="group" aria-label="Chart time range">
+            <button type="button" id="rangeWeek" class="range-btn active">1 week</button>
+            <button type="button" id="rangeMonth" class="range-btn">1 month</button>
+        </div>
+    </div>
+
+    <!-- CHART -->
+    <div class="chart-wrap">
+        <canvas id="stockChart"></canvas>
+    </div>
+
+    <div class="week-table-section">
+        <h3 class="week-table-heading" id="dataTableHeading">Daily OHLC</h3>
+        <div class="week-table-scroll table-viewport-capped" id="weekTableScroll">
+            <table class="week-table" id="weekTable" aria-label="Daily stock OHLC">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Open</th>
+                        <th>High</th>
+                        <th>Low</th>
+                        <th>Close</th>
+                        <th>Volume</th>
+                    </tr>
+                </thead>
+                <tbody id="weekTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<!-- INFO GRID -->
+<div class="info-grid">
+
+    <!-- OVERVIEW -->
+    <div class="info-card info-card-capped">
+        <h3>Overview</h3>
+        <div class="info-card-scroll-body">
+            <div class="info-row">
+                <span class="info-label">Current Price</span>
+                <span class="info-value" id="price">—</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Market Cap</span>
+                <span class="info-value" id="marketCap">—</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">P/E Ratio</span>
+                <span class="info-value" id="peRatio">—</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- NEWS -->
+    <div class="info-card info-card-capped">
+        <div class="news-header">
+            <h3>Latest News</h3>
+            <a href="#" class="see-all">See all</a>
+        </div>
+        <div class="info-card-scroll-body">
+            <div id="newsList"></div>
+        </div>
+    </div>
+
+    <!-- TECH INDICATORS -->
+    <div class="info-card info-card-capped">
+        <h3>Technical Indicators</h3>
+        <div class="info-card-scroll-body">
+            <div class="info-row">
+                <span class="info-label">Low</span>
+                <span class="info-value" id="techLow">—</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">High</span>
+                <span class="info-value" id="techHigh">—</span>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+</div>
+
+<script src="script.js"></script>
+
+</body>
+</html>
