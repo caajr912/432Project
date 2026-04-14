@@ -28,6 +28,9 @@
 </nav>
 
 <div class="container">
+  <div class="page-note">
+    <p>To test live data, run the backend with <code>npm run dev</code> and open this page through the server at <code>http://localhost:3000</code>. Then search for a ticker like <strong>AAPL</strong>.</p>
+  </div>
 
 <!-- MAIN CARD -->
 <div class="main-card">
@@ -128,6 +131,17 @@
 </div>
 
 <script src="script.js"></script>
+<script>
+  const tickerInput = document.getElementById('ticker');
+  if (tickerInput) {
+    tickerInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        getStock();
+      }
+    });
+  }
+</script>
 
 </body>
 </html>
