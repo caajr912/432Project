@@ -29,6 +29,10 @@ YAHOO_HEADERS = {
 }
 
 DEFAULT_TICKERS = [
+    # Market indexes
+    "^GSPC",   # S&P 500
+    "^DJI",    # Dow Jones
+    "^IXIC",   # Nasdaq Composite
     "AAPL", "MSFT", "GOOGL", "AMZN", "META",
     "NVDA", "TSLA", "JPM", "XOM", "JNJ",
 ]
