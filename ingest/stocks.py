@@ -82,10 +82,6 @@ def run(conn: sqlite3.Connection, tickers: list[str] = None, lookback_days: int 
     tickers = tickers or DEFAULT_TICKERS
 
     to_ts = int(time.time())
-    from_ts = int((date.today() - timedelta(days=lookback_days)).strftime("%s") 
-                  if hasattr(date.today(), 'strftime') 
-                  else time.time() - lookback_days * 86400)
-    # Cleaner cross-platform timestamp:
     from_ts = to_ts - (lookback_days * 86400)
 
     total_rows = 0
