@@ -3,12 +3,13 @@ ingest/run.py
 Main ingestion entry point.
 
 Usage:
-    python run.py                        # full pipeline: nyt -> stocks -> ner
-    python run.py --only nyt             # just headlines
-    python run.py --only stocks          # just stock data
-    python run.py --only ner             # just NER/sentiment pass
-    python run.py --tickers AAPL TSLA    # specific tickers (stocks step)
-    python run.py --lookback 90          # days of stock history (default 365)
+    python run.py                        # full pipeline: nyt -> stocks -> ner -> graph
+    python run.py --only nyt
+    python run.py --only stocks
+    python run.py --only ner
+    python run.py --only graph
+    python run.py --tickers AAPL TSLA
+    python run.py --lookback 90
 """
 
 import argparse
@@ -18,11 +19,12 @@ from db import get_conn
 import nyt
 import stocks
 import ner
+import graph
 
 
 def main():
     parser = argparse.ArgumentParser(description="StockMap ingestion runner")
-    parser.add_argument("--only", choices=["nyt", "stocks", "ner"],
+    parser.add_argument("--only", choices=["nyt", "stocks", "ner", "graph"],
                         help="Run only one step")
     parser.add_argument("--tickers", nargs="+",
                         help="Override default ticker list (stocks step)")
@@ -39,12 +41,16 @@ def main():
             stocks.run(conn, tickers=args.tickers, lookback_days=args.lookback)
         elif args.only == "ner":
             ner.run(conn)
+        elif args.only == "graph":
+            graph.run(conn)
         else:
             nyt.run(conn)
             print()
             stocks.run(conn, tickers=args.tickers, lookback_days=args.lookback)
             print()
             ner.run(conn)
+            print()
+            graph.run(conn)
 
     print("\n=== Done ===\n")
 
