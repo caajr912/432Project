@@ -234,6 +234,28 @@ app.get("/api/metric", async (req, res) => {
   }
 });
 
+app.get("/api/nyt-headlines", async (req, res) => {
+  try {
+    const sqlite3 = require('sqlite3').verbose();
+    const db = new sqlite3.Database('./data/staging.db');
+    db.all("SELECT headline, sentiment, entities_json, published_date FROM headlines WHERE processed = 1 ORDER BY published_date DESC LIMIT 10", [], (err, rows) => {
+      if (err) {
+        return res.status(500).json({ error: err.message });
+      }
+      const headlines = rows.map(row => ({
+        headline: row.headline,
+        sentiment: row.sentiment,
+        entities: JSON.parse(row.entities_json || '[]'),
+        published_date: row.published_date
+      }));
+      res.json(headlines);
+      db.close();
+    });
+  } catch (e) {
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+
 app.use(express.static(FRONTEND));
 
 function startListen(port, attempt) {
