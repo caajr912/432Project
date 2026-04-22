@@ -259,3 +259,53 @@ h3{
 p{
     margin:8px 0;
 }
+
+/* NYT HEADLINES */
+.refresh-btn {
+    background: #2563eb;
+    color: white;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.refresh-btn:hover {
+    background: #1d4ed8;
+}
+
+.nyt-card {
+    border-left: 4px solid #e5e7eb; /* Default neutral */
+    padding: 8px;
+    margin-bottom: 8px;
+    background: #f9fafb;
+    border-radius: 4px;
+}
+
+.nyt-card.positive {
+    border-left-color: #10b981; /* Green for positive */
+}
+
+.nyt-card.negative {
+    border-left-color: #ef4444; /* Red for negative */
+}
+
+.nyt-sentiment {
+    font-weight: bold;
+    font-size: 12px;
+    margin-bottom: 4px;
+}
+
+.nyt-entities {
+    font-size: 11px;
+    color: #6b7280;
+    margin-top: 4px;
+}
+
+.nyt-entities span {
+    background: #e5e7eb;
+    padding: 2px 4px;
+    border-radius: 2px;
+    margin-right: 4px;
+}

@@ -121,3 +121,59 @@ function clearError() {
   const newsList = document.getElementById("newsList");
   if (newsList) newsList.innerHTML = "";
 }
+
+// NYT Headlines functions
+async function getNytHeadlines() {
+  const nytList = document.getElementById("nytList");
+  nytList.innerHTML = '<div class="newsCard">Loading NYT headlines...</div>';
+
+  try {
+    const res = await fetch(buildApiUrl("/api/nyt-headlines"));
+    if (!res.ok) throw new Error("Failed to load NYT headlines");
+    const headlines = await res.json();
+    updateNytHeadlines(headlines);
+  } catch (error) {
+    nytList.innerHTML = `<div class="newsCard">Error: ${error.message}</div>`;
+  }
+}
+
+function updateNytHeadlines(headlines) {
+  const nytList = document.getElementById("nytList");
+  nytList.innerHTML = "";
+
+  if (!Array.isArray(headlines) || headlines.length === 0) {
+    nytList.innerHTML = '<div class="newsCard">No NYT headlines available.</div>';
+    return;
+  }
+
+  headlines.slice(0, 5).forEach((item) => {
+    const div = document.createElement("div");
+    div.className = "nyt-card";
+    
+    // Determine sentiment class
+    const sentiment = item.sentiment || 0;
+    if (sentiment > 0.05) div.classList.add("positive");
+    else if (sentiment < -0.05) div.classList.add("negative");
+
+    // Sentiment label
+    const sentimentLabel = sentiment > 0.05 ? "POSITIVE" : sentiment < -0.05 ? "NEGATIVE" : "NEUTRAL";
+    div.innerHTML = `
+      <div class="nyt-sentiment">${sentimentLabel} (${sentiment.toFixed(2)})</div>
+      <div class="news-title">${item.headline}</div>
+      <div class="nyt-entities">
+        ${item.entities ? item.entities.map(e => `<span>${e.text} (${e.label})</span>`).join("") : "No entities"}
+      </div>
+      <p class="news-date">${item.published_date}</p>
+    `;
+    nytList.appendChild(div);
+  });
+}
+
+// Add event listener for refresh button
+document.addEventListener("DOMContentLoaded", () => {
+  getNytHeadlines(); // Load on page load
+  const refreshBtn = document.getElementById("refreshNyt");
+  if (refreshBtn) {
+    refreshBtn.addEventListener("click", getNytHeadlines);
+  }
+});
