@@ -257,7 +257,7 @@ def run(sqlite_conn: sqlite3.Connection):
                 SELECT id, headline, abstract, url, published_date,
                        sentiment, section, entities_json
                 FROM headlines
-                WHERE processed = 1
+                WHERE processed IN (1, 3)
                 """
             ).fetchall()
 
