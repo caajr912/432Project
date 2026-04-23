@@ -30,7 +30,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GEMINI_MODEL   = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 # 2.5-flash free tier: 5 requests/min
-REQUEST_DELAY = 13  # seconds between calls (60s / 5 req + buffer)
+REQUEST_DELAY = 5  # seconds between calls (60s / 5 req + buffer)
 
 # Indexes we can link macro news to
 MACRO_TICKERS = ["^GSPC", "^DJI", "^IXIC"]
