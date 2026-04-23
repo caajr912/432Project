@@ -1,19 +1,9 @@
-# Core
-requests==2.31.0
-python-dotenv==1.0.0
-
-# NER / Sentiment (next phase)
-spacy==3.7.4
+fastapi==0.136.0
+uvicorn==0.34.2
+neo4j==6.1.0
+spacy==3.8.14
 vaderSentiment==3.3.2
-
-# Graph DB
-neo4j==5.19.0
-
-# API framework (when we add FastAPI layer)
-fastapi==0.111.0
-uvicorn[standard]==0.29.0
-
-# Testing
-pytest==8.2.0
-pytest-asyncio==0.23.6
-httpx==0.27.0
+requests==2.31.0
+python-dotenv==1.1.0
+pytest==8.3.5
+httpx==0.28.1

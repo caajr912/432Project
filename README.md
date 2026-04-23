@@ -160,6 +160,23 @@ Finnhub / Yahoo Finance ─────────────────┘
                              (graph viz + stock charts)
 ```
 
+## Running the API
+
+```bash
+python -m uvicorn api.main:app --reload
+```
+
+API runs at http://localhost:8000
+Interactive docs at http://localhost:8000/docs
+
+### Endpoints
+- `GET /api/tickers` — available tickers
+- `GET /api/articles` — headlines (filter by ?section= or ?sentiment=)
+- `GET /api/prices/{ticker}` — price history (?days=30)
+- `GET /api/graph/{ticker}` — knowledge graph nodes + edges for a ticker
+- `GET /api/correlate/{ticker}` — sentiment vs price correlation (?window_days=3)
+- `GET /health` — health check
+
 ---
 
 ## Scrum
