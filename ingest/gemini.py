@@ -27,13 +27,13 @@ from dotenv import load_dotenv
 load_dotenv()
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-GEMINI_MODEL   = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+GEMINI_MODEL   = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
-# Rate limit: free tier is 15 requests/min for flash
-REQUEST_DELAY = 4.5  # seconds between calls to stay under limit
+# 2.5-flash free tier: 5 requests/min
+REQUEST_DELAY = 13  # seconds between calls (60s / 5 req + buffer)
 
 # Indexes we can link macro news to
-MACRO_TICKERS  = ["^GSPC", "^DJI", "^IXIC"]
+MACRO_TICKERS = ["^GSPC", "^DJI", "^IXIC"]
 SECTOR_MAP = {
     "energy":       ["XOM"],
     "tech":         ["AAPL", "MSFT", "GOOGL", "NVDA", "META"],
@@ -96,6 +96,11 @@ def enrich_headline(model, headline: str, abstract: str) -> dict | None:
     except json.JSONDecodeError:
         return None
     except Exception as e:
+        error_str = str(e)
+        if "429" in error_str:
+            print(f"    [GEMINI] Rate limited — waiting 60 seconds...")
+            time.sleep(60)
+            return None
         print(f"    [GEMINI] API error: {e}")
         return None
 
@@ -185,11 +190,11 @@ def process_batch(conn: sqlite3.Connection, model, batch_size: int = 20) -> int:
         conn.execute(
             """
             UPDATE headlines
-            SET entities_json  = ?,
-                gemini_relationship = ?,
-                gemini_sentiment    = ?,
-                gemini_macro        = ?,
-                processed      = 3
+            SET entities_json        = ?,
+                gemini_relationship  = ?,
+                gemini_sentiment     = ?,
+                gemini_macro         = ?,
+                processed            = 3
             WHERE id = ?
             """,
             (
@@ -244,7 +249,7 @@ def run(conn: sqlite3.Connection):
         print(f"  [GEMINI] {total} headlines enriched so far...")
 
     if total == 0:
-        print("  [GEMINI] No headlines pending Gemini enrichment (all processed=1 rows done)")
+        print("  [GEMINI] No headlines pending Gemini enrichment")
     else:
         print(f"  [GEMINI] Done — {total} headlines enriched")
 
