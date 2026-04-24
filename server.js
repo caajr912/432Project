@@ -5,7 +5,7 @@ const express = require("express");
 
 const PORT_START = Number(process.env.PORT) || 3000;
 const PORT_MAX_TRIES = 25;
-const FRONTEND = path.join(__dirname, "432Project-main", "Frontend");
+const FRONTEND = path.join(__dirname, "Frontend");
 const FINNHUB_BASE = "https://finnhub.io/api/v1";
 const token = (process.env.FINNHUB_API_KEY || "").trim();
 
