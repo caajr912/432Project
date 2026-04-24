@@ -276,6 +276,16 @@ function startListen(port, attempt) {
     }
     if (!token) console.warn("Warning: FINNHUB_API_KEY is not set in .env");
   });
+  return srv;
 }
 
-startListen(PORT_START, 0);
+if (require.main === module) {
+  startListen(PORT_START, 0);
+}
+
+module.exports = {
+  app,
+  yahooChartSymbol,
+  filterCandlesByRange,
+  startListen,
+};

@@ -16,6 +16,11 @@ pnpm-debug.log*
 .DS_Store
 Thumbs.db
 
+# Python
+.pytest_cache/
+__pycache__/
+*.py[cod]
+
 # Editor
 .idea/
 .vscode/
