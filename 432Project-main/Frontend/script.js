@@ -5,6 +5,103 @@ let chartRangeMode = "week";
 let cacheTicker = "";
 let cacheQuote = null;
 let cacheCandles = null;
+/** Articles from Neo4j: (Article)-[:MENTIONS]->(Entity)-[:MAPS_TO]->(Ticker) */
+let cacheKgArticles = [];
+/** Last proxy/API error for knowledge-graph articles (shown under chart) */
+let cacheKgLoadError = "";
+/** One entry per scatter point — aligned with scatter dataset `data` */
+let cacheScatterMeta = [];
+
+const KG_SCATTER_LABEL = "Graph-linked news (Neo4j)";
+
+/** US equity session calendar day for a bar timestamp (matches YYYY-MM-DD headlines). */
+function candleDayNY(tsSec) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/New_York",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(tsSec * 1000));
+}
+
+function parseYmdUtc(ymd) {
+  const s = (ymd || "").slice(0, 10);
+  const p = s.split("-");
+  if (p.length !== 3) return NaN;
+  const y = Number(p[0]);
+  const m = Number(p[1]);
+  const d = Number(p[2]);
+  if (!y || !m || !d) return NaN;
+  return Date.UTC(y, m - 1, d);
+}
+
+/**
+ * Map article published_date to a bar index in the current slice (0 = first visible bar).
+ * Exact NY session date match, else nearest trading day within maxDaySlack calendar days.
+ */
+function matchArticleToBarIndex(slice, pubYmd, maxDaySlack) {
+  if (!slice || !pubYmd) return null;
+  const pub = pubYmd.slice(0, 10);
+  const dateToRel = new Map();
+  let rel = 0;
+  for (let i = slice.start; i < slice.n; i++) {
+    dateToRel.set(candleDayNY(slice.t[i]), rel);
+    rel++;
+  }
+  if (dateToRel.has(pub)) return dateToRel.get(pub);
+
+  const pubTs = parseYmdUtc(pub);
+  if (Number.isNaN(pubTs)) return null;
+  let bestRel = null;
+  let bestDist = Infinity;
+  rel = 0;
+  for (let i = slice.start; i < slice.n; i++) {
+    const dayTs = parseYmdUtc(candleDayNY(slice.t[i]));
+    if (Number.isNaN(dayTs)) {
+      rel++;
+      continue;
+    }
+    const dist = Math.abs(dayTs - pubTs);
+    if (dist < bestDist) {
+      bestDist = dist;
+      bestRel = rel;
+    }
+    rel++;
+  }
+  const maxMs = maxDaySlack * 86400000;
+  if (bestRel == null || bestDist > maxMs) return null;
+  return bestRel;
+}
+
+function buildKgScatterPoints(slice, labels, highs, lows, articles) {
+  cacheScatterMeta = [];
+  const scatterData = [];
+  if (!slice || !articles.length || !labels.length) return scatterData;
+
+  const byRel = new Map();
+  for (const a of articles) {
+    const pub = (a.published_date || "").slice(0, 10);
+    const rel = matchArticleToBarIndex(slice, pub, 4);
+    if (rel == null || rel < 0 || rel >= labels.length) continue;
+    if (!byRel.has(rel)) byRel.set(rel, []);
+    byRel.get(rel).push(a);
+  }
+
+  byRel.forEach((arts, rel) => {
+    const label = labels[rel];
+    const hi = Number(highs[rel]);
+    const lo = Number(lows[rel]);
+    const mid = (hi + lo) / 2;
+    const span = Math.max(hi - lo, Math.abs(hi) * 0.004, 0.5);
+    arts.forEach((article, j) => {
+      const y = mid + span * (0.2 + j * 0.11);
+      scatterData.push({ x: label, y });
+      cacheScatterMeta.push(article);
+    });
+  });
+
+  return scatterData;
+}
 
 function formatUsd(n) {
   if (n == null || Number.isNaN(n)) return "—";
@@ -177,7 +274,6 @@ function applyChartAndTable() {
 
   const slice = sliceByChartRange(candles, chartRangeMode);
   renderDataTable(slice);
-  document.getElementById("weekChartSubtitle").textContent = chartRangeSubtitle(slice, chartRangeMode);
   updateDataTableHeading(slice, chartRangeMode);
 
   const price = quote.c;
@@ -217,6 +313,16 @@ function applyChartAndTable() {
 
   const trends = highs.map((hi, i) => (Number(hi) + Number(lows[i])) / 2);
 
+  const kgScatter = buildKgScatterPoints(slice, labels, highs, lows, cacheKgArticles);
+
+  let sub = chartRangeSubtitle(slice, chartRangeMode);
+  if (kgScatter.length > 0) {
+    sub += ` — purple dots = Neo4j-linked articles (${kgScatter.length} in range)`;
+  } else if (cacheKgLoadError) {
+    sub += ` — ${cacheKgLoadError.slice(0, 140)}`;
+  }
+  document.getElementById("weekChartSubtitle").textContent = sub;
+
   const ctx = document.getElementById("stockChart").getContext("2d");
   if (chart) chart.destroy();
 
@@ -226,11 +332,7 @@ function applyChartAndTable() {
       ? "Trading days (last ~30 calendar days)"
       : "Trading days (1 week, 7 sessions)";
 
-  chart = new Chart(ctx, {
-    type: "line",
-    data: {
-      labels,
-      datasets: [
+  const datasets = [
         {
           label: "Daily high (USD)",
           data: highs,
@@ -271,12 +373,33 @@ function applyChartAndTable() {
           pointBorderWidth: 0,
           borderWidth: 2,
         },
-      ],
+  ];
+
+  if (kgScatter.length > 0) {
+    datasets.push({
+      type: "scatter",
+      label: KG_SCATTER_LABEL,
+      data: kgScatter,
+      backgroundColor: "rgba(124, 58, 237, 0.92)",
+      borderColor: "#fff",
+      borderWidth: 2,
+      pointRadius: denseMonth ? 5 : 7,
+      pointHoverRadius: 10,
+      pointHitRadius: 16,
+      order: 10,
+    });
+  }
+
+  chart = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels,
+      datasets,
     },
     options: {
       responsive: true,
       interaction: { mode: "nearest", intersect: true },
-      hover: { mode: null },
+      hover: { mode: "nearest", intersect: true },
       onClick(event, elements, c) {
         if (elements.length === 0) {
           c.setActiveElements([]);
@@ -305,13 +428,39 @@ function applyChartAndTable() {
           },
         },
         tooltip: {
-          mode: "index",
+          mode: "nearest",
           intersect: true,
           events: ["click", "touchstart"],
           callbacks: {
+            title(items) {
+              if (!items.length) return "";
+              const raw = items[0].raw;
+              if (raw && raw.x != null) return String(raw.x);
+              const lab = items[0].chart?.data?.labels;
+              const di = items[0].dataIndex;
+              if (lab && lab[di] != null) return String(lab[di]);
+              return "";
+            },
             label(ctx) {
+              if (ctx.dataset.label === KG_SCATTER_LABEL) {
+                const meta = cacheScatterMeta[ctx.dataIndex];
+                if (!meta) return "";
+                const h = (meta.headline || "—").slice(0, 140);
+                const s =
+                  meta.sentiment != null && !Number.isNaN(Number(meta.sentiment))
+                    ? ` · sentiment ${Number(meta.sentiment).toFixed(2)}`
+                    : "";
+                return `${h}${s}`;
+              }
               const v = ctx.parsed.y;
               return `${ctx.dataset.label}: ${formatUsd(v)}`;
+            },
+            afterLabel(ctx) {
+              if (ctx.dataset.label === KG_SCATTER_LABEL) {
+                const meta = cacheScatterMeta[ctx.dataIndex];
+                return meta && meta.url ? String(meta.url) : "";
+              }
+              return "";
             },
           },
         },
@@ -374,12 +523,13 @@ async function getStock() {
   const q = (path) => `${base}${path}?symbol=${encodeURIComponent(ticker)}`;
 
   try {
-    const [quoteRes, candleRes, newsRes, profileRes, metricRes] = await Promise.all([
+    const [quoteRes, candleRes, newsRes, profileRes, metricRes, kgRes] = await Promise.all([
       fetch(q("/api/quote")),
       fetch(q("/api/candles")),
       fetch(q("/api/news")),
       fetch(q("/api/profile")),
       fetch(q("/api/metric")),
+      fetch(q("/api/kg/chart-articles")),
     ]);
 
     const quote = await quoteRes.json();
@@ -389,6 +539,21 @@ async function getStock() {
     const news = newsRes.ok ? await newsRes.json() : [];
     const profile = profileRes.ok ? await profileRes.json() : null;
     const metricPayload = metricRes.ok ? await metricRes.json() : null;
+
+    let kgRaw = null;
+    try {
+      kgRaw = await kgRes.json();
+    } catch {
+      kgRaw = {};
+    }
+    cacheKgArticles = Array.isArray(kgRaw.articles) ? kgRaw.articles : [];
+    cacheKgLoadError = "";
+    if (!kgRes.ok) {
+      cacheKgLoadError =
+        kgRaw && kgRaw.error != null
+          ? String(kgRaw.error)
+          : `Could not reach KG API (HTTP ${kgRes.status}). Start FastAPI: uvicorn api.main:app --host 127.0.0.1 --port 8000`;
+    }
 
     const price = quote.c;
     document.getElementById("price").innerText =
@@ -438,6 +603,9 @@ async function getStock() {
     cacheTicker = "";
     cacheQuote = null;
     cacheCandles = null;
+    cacheKgArticles = [];
+    cacheKgLoadError = "";
+    cacheScatterMeta = [];
     document.getElementById("price").innerText = e.message || "Request failed";
     document.getElementById("weekChartSubtitle").textContent =
       "High (green), low (red), trend (blue) — pick 1 week or 1 month after searching";

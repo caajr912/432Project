@@ -5,6 +5,7 @@ FastAPI backend for StockMap.
 Endpoints:
     GET /api/articles               — recent headlines with sentiment + entities
     GET /api/prices/{ticker}        — price history for a ticker
+    GET /api/chart-articles/{ticker} — distinct articles linked to a ticker (for chart markers)
     GET /api/graph/{ticker}         — articles + entities linked to a ticker
     GET /api/correlate/{ticker}     — core MVP: sentiment vs price movement
     GET /api/tickers                — list of available tickers in DB
@@ -164,6 +165,53 @@ def get_prices(
     if not rows:
         raise HTTPException(status_code=404, detail=f"No price data for {ticker}")
     return {"ticker": ticker, "prices": rows}
+
+
+def _norm_pub_date(v) -> str:
+    if v is None:
+        return ""
+    if hasattr(v, "isoformat"):
+        return v.isoformat()[:10]
+    s = str(v)
+    return s[:10] if len(s) >= 10 else s
+
+
+@app.get("/api/chart-articles/{ticker}")
+def get_chart_articles(
+    ticker: str,
+    limit: int = Query(default=120, le=400),
+):
+    """
+    Articles for a ticker via (Article)-[:MENTIONS]->(Entity)-[:MAPS_TO]->(Ticker).
+    `published_date` is normalized to YYYY-MM-DD for aligning with daily candles.
+    """
+    ticker = ticker.upper()
+    rows = run_query(
+        """
+        MATCH (a:Article)-[:MENTIONS]->(e:Entity)-[:MAPS_TO]->(t:Ticker {symbol: $symbol})
+        RETURN DISTINCT a.id AS id,
+               a.headline AS headline,
+               a.published_date AS published_date,
+               a.sentiment AS sentiment,
+               a.url AS url
+        ORDER BY a.published_date DESC
+        LIMIT $limit
+        """,
+        {"symbol": ticker, "limit": limit},
+    )
+    articles = []
+    for r in rows:
+        pd = _norm_pub_date(r.get("published_date"))
+        if not pd:
+            continue
+        articles.append({
+            "id": r.get("id"),
+            "headline": r.get("headline") or "",
+            "published_date": pd,
+            "sentiment": r.get("sentiment"),
+            "url": r.get("url") or "",
+        })
+    return {"ticker": ticker, "articles": articles}
 
 
 @app.get("/api/graph/{ticker}")
