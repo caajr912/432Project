@@ -20,14 +20,17 @@
 <!-- TOP NAV -->
 <nav class="topnav">
     <div class="topnav-links">
-        <a href="#" class="nav-link active" id="navHome" onclick="showView('home')">Home</a>
-        <a href="#" class="nav-link" id="navMarkets" onclick="showView('markets')">Markets</a>
-        <a href="#" class="nav-link" id="navResearch" onclick="showView('research')">Research</a>
-        <a href="#" class="nav-link" id="navPortfolio" onclick="showView('portfolio')">Portfolio</a>
+        <a href="#" class="nav-link active">Home</a>
+        <a href="#" class="nav-link">Markets</a>
+        <a href="#" class="nav-link">Research</a>
+        <a href="#" class="nav-link">Portfolio</a>
     </div>
 </nav>
 
-<div class="container" id="homeSection">
+<div class="container">
+  <div class="page-note">
+    <p>To test live data, run the backend with <code>npm run dev</code> and open this page through the server at <code>http://localhost:3000</code>. Then search for a ticker like <strong>AAPL</strong>.</p>
+  </div>
 
 <!-- MAIN CARD -->
 <div class="main-card">
@@ -46,45 +49,13 @@
             </div>
         </div>
         <div class="search-box">
-            <select id="tickerSelect" class="ticker-select" aria-label="Pick a stock" onchange="onTickerSelect()">
-                <option value="">Pick a stock…</option>
-                <option value="AAPL">Apple (AAPL)</option>
-                <option value="MSFT">Microsoft (MSFT)</option>
-                <option value="GOOGL">Alphabet (GOOGL)</option>
-                <option value="AMZN">Amazon (AMZN)</option>
-                <option value="META">Meta (META)</option>
-                <option value="NVDA">NVIDIA (NVDA)</option>
-                <option value="TSLA">Tesla (TSLA)</option>
-                <option value="JPM">JPMorgan (JPM)</option>
-                <option value="V">Visa (V)</option>
-                <option value="JNJ">Johnson &amp; Johnson (JNJ)</option>
-                <option value="WMT">Walmart (WMT)</option>
-                <option value="PG">Procter &amp; Gamble (PG)</option>
-                <option value="MA">Mastercard (MA)</option>
-                <option value="UNH">UnitedHealth (UNH)</option>
-                <option value="HD">Home Depot (HD)</option>
-                <option value="DIS">Disney (DIS)</option>
-                <option value="BAC">Bank of America (BAC)</option>
-                <option value="XOM">Exxon Mobil (XOM)</option>
-                <option value="PFE">Pfizer (PFE)</option>
-                <option value="KO">Coca-Cola (KO)</option>
-                <option value="NFLX">Netflix (NFLX)</option>
-            </select>
             <div class="search-input-wrap">
-                <input id="ticker" placeholder="Or type a symbol" autocomplete="off">
+                <input id="ticker" placeholder="Name of stock">
                 <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2">
                     <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
                 </svg>
             </div>
-            <button type="button" onclick="getStock()">Search</button>
-        </div>
-    </div>
-
-    <div class="chart-toolbar">
-        <p class="chart-subtitle" id="weekChartSubtitle">High (green), low (red), trend = average of both (blue) — pick a range (search a symbol)</p>
-        <div class="chart-range-toggle" role="group" aria-label="Chart time range">
-            <button type="button" id="rangeWeek" class="range-btn active">1 week</button>
-            <button type="button" id="rangeMonth" class="range-btn">1 month</button>
+            <button onclick="getStock()">Search</button>
         </div>
     </div>
 
@@ -93,73 +64,77 @@
         <canvas id="stockChart"></canvas>
     </div>
 
-    <div class="week-table-section">
-        <h3 class="week-table-heading" id="dataTableHeading">Daily OHLC</h3>
-        <div class="week-table-scroll table-viewport-capped" id="weekTableScroll">
-            <table class="week-table" id="weekTable" aria-label="Daily stock OHLC">
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Open</th>
-                        <th>High</th>
-                        <th>Low</th>
-                        <th>Close</th>
-                        <th>Volume</th>
-                    </tr>
-                </thead>
-                <tbody id="weekTableBody"></tbody>
-            </table>
-        </div>
-    </div>
-
 </div>
 
 <!-- INFO GRID -->
 <div class="info-grid">
 
     <!-- OVERVIEW -->
-    <div class="info-card info-card-capped">
+    <div class="info-card">
         <h3>Overview</h3>
-        <div class="info-card-scroll-body">
-            <div class="info-row">
-                <span class="info-label">Current Price</span>
-                <span class="info-value" id="price">—</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Market Cap</span>
-                <span class="info-value" id="marketCap">—</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">P/E Ratio</span>
-                <span class="info-value" id="peRatio">—</span>
-            </div>
+        <div class="info-row">
+            <span class="info-label">Current Price</span>
+            <span class="info-value" id="price">—</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Market Cap</span>
+            <span class="info-value">$13.3B</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">P/E Ratio</span>
+            <span class="info-value">13.50</span>
         </div>
     </div>
 
     <!-- NEWS -->
-    <div class="info-card info-card-capped">
+    <div class="info-card">
         <div class="news-header">
             <h3>Latest News</h3>
             <a href="#" class="see-all">See all</a>
         </div>
-        <div class="info-card-scroll-body">
-            <div id="newsList"></div>
+        <div id="newsList">
+            <div class="newsCard">
+                <p class="news-title">New Goran headlines hinting the break of the UK market trends</p>
+                <p class="news-date">Dec 28, 2022</p>
+            </div>
+            <div class="newsCard">
+                <p class="news-title">NEB reuninien deartson ouids ressuen importing chorts in fiamountesting.</p>
+                <p class="news-date">Nov 27, 2023</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- NYT HEADLINES -->
+    <div class="info-card">
+        <div class="news-header">
+            <h3>NYT Market Headlines</h3>
+            <button id="refreshNyt" class="refresh-btn">Refresh</button>
+        </div>
+        <div id="nytList">
+            <div class="newsCard">Loading NYT headlines...</div>
         </div>
     </div>
 
     <!-- TECH INDICATORS -->
-    <div class="info-card info-card-capped">
+    <div class="info-card">
         <h3>Technical Indicators</h3>
-        <div class="info-card-scroll-body">
-            <div class="info-row">
-                <span class="info-label">Low</span>
-                <span class="info-value" id="techLow">—</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">High</span>
-                <span class="info-value" id="techHigh">—</span>
-            </div>
+        <div class="info-row">
+            <span class="info-label">Low</span>
+            <span class="info-value">$1.95</span>
         </div>
+        <div class="info-row">
+            <span class="info-label">High</span>
+            <span class="info-value">$1.95</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Coin Fact</span>
+            <span class="info-value negative">-2.38</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">High Canillity</span>
+            <span class="info-value positive">18.20</span>
+        </div>
+        <button class="load-more">Load more</button>
     </div>
 
 </div>
@@ -167,193 +142,17 @@
 </div>
 
 <script src="script.js"></script>
-
-<!-- Markets Section (hidden by default) -->
-<div class="container" id="marketsSection" style="display:none;">
-    <div class="main-card">
-        <div class="header-row">
-            <div style="display:flex;flex-direction:column;">
-                <h3 style="margin:0;color:var(--accent, #00ffcc);">Markets Dashboard</h3>
-                <p style="margin:6px 0 0 0;color:#4a7c59;">Live indices, top movers with sparklines, and market health</p>
-            </div>
-        </div>
-
-        <!-- Market Status Row -->
-        <div class="status-row">
-            <div class="status-card" id="marketHours">
-                <div class="status-label">Market Status</div>
-                <div class="status-value">Open</div>
-            </div>
-            <div class="status-card" id="vixCard">
-                <div class="status-label tooltip-trigger">VIX (Fear Index)<span class="tooltip-text">Volatility Index measuring market fear & uncertainty. Higher = more fear, Lower = more complacency</span></div>
-                <div class="status-value">16.5</div>
-            </div>
-        </div>
-
-        <!-- Indices at the top (main focus) -->
-        <div class="index-area" style="margin-bottom: 20px;">
-            <div class="index-grid" id="indicesGrid">
-                <!-- Index cards inserted here -->
-            </div>
-        </div>
-
-        <!-- Market Breadth & Sector Heatmap -->
-        <div class="analytics-row">
-            <div class="info-card" style="flex: 1;">
-                <h3 class="tooltip-trigger">Market Breadth<span class="tooltip-text">Shows the number of stocks rising vs falling. Indicates overall market health and momentum</span></h3>
-                <div id="marketBreadth">
-                    <div class="breadth-item">
-                        <span class="breadth-label">Advancers</span>
-                        <div class="breadth-bar">
-                            <div class="breadth-fill advancing"></div>
-                        </div>
-                        <span class="breadth-count">2,147</span>
-                    </div>
-                    <div class="breadth-item">
-                        <span class="breadth-label">Decliners</span>
-                        <div class="breadth-bar">
-                            <div class="breadth-fill declining"></div>
-                        </div>
-                        <span class="breadth-count">1,283</span>
-                    </div>
-                </div>
-            </div>
-            <div class="info-card" style="flex: 1;">
-                <h3>Sector Performance</h3>
-                <div id="sectorHeatmap" class="sector-heatmap">
-                    <!-- Sector cells inserted here -->
-                </div>
-            </div>
-        </div>
-
-        <!-- Movers and Sentiment below in a 2-column grid -->
-        <div class="markets-grid-bottom">
-            <div class="movers-area">
-                <div class="info-card">
-                    <h3>Top Movers</h3>
-                    <div id="moversTable">Loading…</div>
-                </div>
-            </div>
-            <div class="sentiment-area">
-                <div class="info-card" id="sentimentCard">
-                    <h3>Market Sentiment</h3>
-                    <div id="marketSentiment">Loading…</div>
-                </div>
-            </div>
-        </div>
-
-    </div>
-</div>
-
-<!-- Research Section (hidden by default) -->
-<div class="container" id="researchSection" style="display:none;">
-    <div class="main-card research-shell">
-        <div class="header-row research-header-row">
-            <div style="display:flex;flex-direction:column;gap:6px;">
-                <h3 style="margin:0;color:#00ffcc;">Research Lab</h3>
-                <p style="margin:0;color:#4a7c59;max-width:760px;">Deep dive a stock, read the story behind the chart, and compare it against nearby peers.</p>
-            </div>
-            <div class="research-badge">AI-ready summary layer</div>
-        </div>
-
-        <div class="research-search-row">
-            <div class="research-search-box">
-                <input id="researchTicker" class="research-input" placeholder="Type a ticker to research" autocomplete="off">
-                <button type="button" onclick="loadResearch()">Research</button>
-            </div>
-            <div class="research-chip-row" aria-label="Quick research tickers">
-                <button type="button" class="research-chip" onclick="setResearchTicker('AAPL')">AAPL</button>
-                <button type="button" class="research-chip" onclick="setResearchTicker('MSFT')">MSFT</button>
-                <button type="button" class="research-chip" onclick="setResearchTicker('NVDA')">NVDA</button>
-                <button type="button" class="research-chip" onclick="setResearchTicker('GOOGL')">GOOGL</button>
-                <button type="button" class="research-chip" onclick="setResearchTicker('AMZN')">AMZN</button>
-            </div>
-        </div>
-
-        <div class="research-layout">
-            <div class="research-main-panel">
-                <div class="chart-toolbar research-toolbar">
-                    <p class="chart-subtitle" id="researchChartSubtitle">Search a symbol to begin the research view.</p>
-                    <div class="chart-range-toggle" role="group" aria-label="Research chart time range">
-                        <button type="button" id="researchRangeWeek" class="range-btn active" onclick="setResearchRange('week')">1 week</button>
-                        <button type="button" id="researchRangeMonth" class="range-btn" onclick="setResearchRange('month')">1 month</button>
-                    </div>
-                </div>
-
-                <div class="chart-wrap research-chart-wrap">
-                    <canvas id="researchChart"></canvas>
-                </div>
-
-                <div class="research-stat-strip">
-                    <div class="research-stat-card">
-                        <span class="research-stat-label">Price</span>
-                        <span class="research-stat-value" id="researchPrice">—</span>
-                    </div>
-                    <div class="research-stat-card">
-                        <span class="research-stat-label">Change</span>
-                        <span class="research-stat-value" id="researchChange">—</span>
-                    </div>
-                    <div class="research-stat-card">
-                        <span class="research-stat-label">Market Cap</span>
-                        <span class="research-stat-value" id="researchMarketCap">—</span>
-                    </div>
-                    <div class="research-stat-card">
-                        <span class="research-stat-label">P/E</span>
-                        <span class="research-stat-value" id="researchPe">—</span>
-                    </div>
-                    <div class="research-stat-card">
-                        <span class="research-stat-label">Volume</span>
-                        <span class="research-stat-value" id="researchVolume">—</span>
-                    </div>
-                    <div class="research-stat-card">
-                        <span class="research-stat-label">Range</span>
-                        <span class="research-stat-value" id="researchRange">—</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="research-side-panel">
-                <div class="info-card research-note-card">
-                    <h3>AI-Ready Thesis</h3>
-                    <div id="researchThesis" class="research-thesis-list">
-                        <div class="research-thesis-item">
-                            <span class="research-thesis-pill bullish">Bull case</span>
-                            <p>Load a ticker to see a machine-readable market summary.</p>
-                        </div>
-                        <div class="research-thesis-item">
-                            <span class="research-thesis-pill bearish">Bear case</span>
-                            <p>Risk factors and valuation notes will appear here.</p>
-                        </div>
-                        <div class="research-thesis-item">
-                            <span class="research-thesis-pill neutral">Watch list</span>
-                            <p>Key catalysts and levels will be highlighted for later AI prompts.</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="info-card research-note-card">
-                    <h3>Key Levels</h3>
-                    <div class="info-row"><span class="info-label">52-Week High</span><span class="info-value" id="researchHigh">—</span></div>
-                    <div class="info-row"><span class="info-label">52-Week Low</span><span class="info-value" id="researchLow">—</span></div>
-                    <div class="info-row"><span class="info-label">Trend Bias</span><span class="info-value" id="researchTrend">—</span></div>
-                    <div class="info-row"><span class="info-label">Signal</span><span class="info-value" id="researchSignal">—</span></div>
-                </div>
-            </div>
-        </div>
-
-        <div class="research-bottom-grid">
-            <div class="info-card research-note-card">
-                <h3>News & Sentiment</h3>
-                <div id="researchNewsList"></div>
-            </div>
-
-            <div class="info-card research-note-card">
-                <h3>Peer Comparison</h3>
-                <div id="researchCompareList" class="research-compare-list"></div>
-            </div>
-        </div>
-    </div>
-</div>
+<script>
+  const tickerInput = document.getElementById('ticker');
+  if (tickerInput) {
+    tickerInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        getStock();
+      }
+    });
+  }
+</script>
 
 </body>
 </html>
