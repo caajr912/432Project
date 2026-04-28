@@ -363,6 +363,8 @@ function applyChartAndTable() {
           tension: 0.25,
           fill: false,
           pointRadius: denseMonth ? 3 : 5,
+          pointHoverRadius: denseMonth ? 3 : 5,
+          pointHitRadius: denseMonth ? 8 : 10,
           pointBackgroundColor: "#16a34a",
           pointBorderColor: "#fff",
           pointBorderWidth: 2,
@@ -376,6 +378,8 @@ function applyChartAndTable() {
           tension: 0.25,
           fill: false,
           pointRadius: denseMonth ? 3 : 5,
+          pointHoverRadius: denseMonth ? 3 : 5,
+          pointHitRadius: denseMonth ? 8 : 10,
           pointBackgroundColor: "#dc2626",
           pointBorderColor: "#fff",
           pointBorderWidth: 2,
@@ -463,7 +467,10 @@ function applyChartAndTable() {
           try {
             c.setActiveElements(elements);
             if (c.tooltip) c.tooltip.setActiveElements(elements, { x: event.x, y: event.y });
+            // Force an immediate render on click (some Chart.js builds otherwise wait for a move event).
+            if (c.tooltip && typeof c.tooltip.update === "function") c.tooltip.update(true);
             c.update();
+            if (typeof c.draw === "function") c.draw();
           } catch {}
         }
       },
@@ -482,6 +489,8 @@ function applyChartAndTable() {
           // Default: hover tooltips should be precise.
           mode: "nearest",
           intersect: true,
+          // Ensure click immediately triggers tooltip evaluation/render.
+          events: ["mousemove", "mouseout", "click", "touchstart", "touchmove"],
           callbacks: {
             title(items) {
               if (!items || items.length === 0) return "";
