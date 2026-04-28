@@ -20,14 +20,14 @@
 <!-- TOP NAV -->
 <nav class="topnav">
     <div class="topnav-links">
-        <a href="#" class="nav-link active">Home</a>
-        <a href="#" class="nav-link">Markets</a>
-        <a href="#" class="nav-link">Research</a>
-        <a href="#" class="nav-link">Portfolio</a>
+        <a href="#" class="nav-link active" id="navHome" onclick="showView('home')">Home</a>
+        <a href="#" class="nav-link" id="navMarkets" onclick="showView('markets')">Markets</a>
+        <a href="#" class="nav-link" id="navResearch" onclick="showView('research')">Research</a>
+        <a href="#" class="nav-link" id="navPortfolio" onclick="showView('portfolio')">Portfolio</a>
     </div>
 </nav>
 
-<div class="container">
+<div class="container" id="homeSection">
 
 <!-- MAIN CARD -->
 <div class="main-card">
@@ -167,6 +167,193 @@
 </div>
 
 <script src="script.js"></script>
+
+<!-- Markets Section (hidden by default) -->
+<div class="container" id="marketsSection" style="display:none;">
+    <div class="main-card">
+        <div class="header-row">
+            <div style="display:flex;flex-direction:column;">
+                <h3 style="margin:0;color:var(--accent, #00ffcc);">Markets Dashboard</h3>
+                <p style="margin:6px 0 0 0;color:#4a7c59;">Live indices, top movers with sparklines, and market health</p>
+            </div>
+        </div>
+
+        <!-- Market Status Row -->
+        <div class="status-row">
+            <div class="status-card" id="marketHours">
+                <div class="status-label">Market Status</div>
+                <div class="status-value">Open</div>
+            </div>
+            <div class="status-card" id="vixCard">
+                <div class="status-label tooltip-trigger">VIX (Fear Index)<span class="tooltip-text">Volatility Index measuring market fear & uncertainty. Higher = more fear, Lower = more complacency</span></div>
+                <div class="status-value">16.5</div>
+            </div>
+        </div>
+
+        <!-- Indices at the top (main focus) -->
+        <div class="index-area" style="margin-bottom: 20px;">
+            <div class="index-grid" id="indicesGrid">
+                <!-- Index cards inserted here -->
+            </div>
+        </div>
+
+        <!-- Market Breadth & Sector Heatmap -->
+        <div class="analytics-row">
+            <div class="info-card" style="flex: 1;">
+                <h3 class="tooltip-trigger">Market Breadth<span class="tooltip-text">Shows the number of stocks rising vs falling. Indicates overall market health and momentum</span></h3>
+                <div id="marketBreadth">
+                    <div class="breadth-item">
+                        <span class="breadth-label">Advancers</span>
+                        <div class="breadth-bar">
+                            <div class="breadth-fill advancing"></div>
+                        </div>
+                        <span class="breadth-count">2,147</span>
+                    </div>
+                    <div class="breadth-item">
+                        <span class="breadth-label">Decliners</span>
+                        <div class="breadth-bar">
+                            <div class="breadth-fill declining"></div>
+                        </div>
+                        <span class="breadth-count">1,283</span>
+                    </div>
+                </div>
+            </div>
+            <div class="info-card" style="flex: 1;">
+                <h3>Sector Performance</h3>
+                <div id="sectorHeatmap" class="sector-heatmap">
+                    <!-- Sector cells inserted here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Movers and Sentiment below in a 2-column grid -->
+        <div class="markets-grid-bottom">
+            <div class="movers-area">
+                <div class="info-card">
+                    <h3>Top Movers</h3>
+                    <div id="moversTable">Loading…</div>
+                </div>
+            </div>
+            <div class="sentiment-area">
+                <div class="info-card" id="sentimentCard">
+                    <h3>Market Sentiment</h3>
+                    <div id="marketSentiment">Loading…</div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- Research Section (hidden by default) -->
+<div class="container" id="researchSection" style="display:none;">
+    <div class="main-card research-shell">
+        <div class="header-row research-header-row">
+            <div style="display:flex;flex-direction:column;gap:6px;">
+                <h3 style="margin:0;color:#00ffcc;">Research Lab</h3>
+                <p style="margin:0;color:#4a7c59;max-width:760px;">Deep dive a stock, read the story behind the chart, and compare it against nearby peers.</p>
+            </div>
+            <div class="research-badge">AI-ready summary layer</div>
+        </div>
+
+        <div class="research-search-row">
+            <div class="research-search-box">
+                <input id="researchTicker" class="research-input" placeholder="Type a ticker to research" autocomplete="off">
+                <button type="button" onclick="loadResearch()">Research</button>
+            </div>
+            <div class="research-chip-row" aria-label="Quick research tickers">
+                <button type="button" class="research-chip" onclick="setResearchTicker('AAPL')">AAPL</button>
+                <button type="button" class="research-chip" onclick="setResearchTicker('MSFT')">MSFT</button>
+                <button type="button" class="research-chip" onclick="setResearchTicker('NVDA')">NVDA</button>
+                <button type="button" class="research-chip" onclick="setResearchTicker('GOOGL')">GOOGL</button>
+                <button type="button" class="research-chip" onclick="setResearchTicker('AMZN')">AMZN</button>
+            </div>
+        </div>
+
+        <div class="research-layout">
+            <div class="research-main-panel">
+                <div class="chart-toolbar research-toolbar">
+                    <p class="chart-subtitle" id="researchChartSubtitle">Search a symbol to begin the research view.</p>
+                    <div class="chart-range-toggle" role="group" aria-label="Research chart time range">
+                        <button type="button" id="researchRangeWeek" class="range-btn active" onclick="setResearchRange('week')">1 week</button>
+                        <button type="button" id="researchRangeMonth" class="range-btn" onclick="setResearchRange('month')">1 month</button>
+                    </div>
+                </div>
+
+                <div class="chart-wrap research-chart-wrap">
+                    <canvas id="researchChart"></canvas>
+                </div>
+
+                <div class="research-stat-strip">
+                    <div class="research-stat-card">
+                        <span class="research-stat-label">Price</span>
+                        <span class="research-stat-value" id="researchPrice">—</span>
+                    </div>
+                    <div class="research-stat-card">
+                        <span class="research-stat-label">Change</span>
+                        <span class="research-stat-value" id="researchChange">—</span>
+                    </div>
+                    <div class="research-stat-card">
+                        <span class="research-stat-label">Market Cap</span>
+                        <span class="research-stat-value" id="researchMarketCap">—</span>
+                    </div>
+                    <div class="research-stat-card">
+                        <span class="research-stat-label">P/E</span>
+                        <span class="research-stat-value" id="researchPe">—</span>
+                    </div>
+                    <div class="research-stat-card">
+                        <span class="research-stat-label">Volume</span>
+                        <span class="research-stat-value" id="researchVolume">—</span>
+                    </div>
+                    <div class="research-stat-card">
+                        <span class="research-stat-label">Range</span>
+                        <span class="research-stat-value" id="researchRange">—</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="research-side-panel">
+                <div class="info-card research-note-card">
+                    <h3>AI-Ready Thesis</h3>
+                    <div id="researchThesis" class="research-thesis-list">
+                        <div class="research-thesis-item">
+                            <span class="research-thesis-pill bullish">Bull case</span>
+                            <p>Load a ticker to see a machine-readable market summary.</p>
+                        </div>
+                        <div class="research-thesis-item">
+                            <span class="research-thesis-pill bearish">Bear case</span>
+                            <p>Risk factors and valuation notes will appear here.</p>
+                        </div>
+                        <div class="research-thesis-item">
+                            <span class="research-thesis-pill neutral">Watch list</span>
+                            <p>Key catalysts and levels will be highlighted for later AI prompts.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="info-card research-note-card">
+                    <h3>Key Levels</h3>
+                    <div class="info-row"><span class="info-label">52-Week High</span><span class="info-value" id="researchHigh">—</span></div>
+                    <div class="info-row"><span class="info-label">52-Week Low</span><span class="info-value" id="researchLow">—</span></div>
+                    <div class="info-row"><span class="info-label">Trend Bias</span><span class="info-value" id="researchTrend">—</span></div>
+                    <div class="info-row"><span class="info-label">Signal</span><span class="info-value" id="researchSignal">—</span></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="research-bottom-grid">
+            <div class="info-card research-note-card">
+                <h3>News & Sentiment</h3>
+                <div id="researchNewsList"></div>
+            </div>
+
+            <div class="info-card research-note-card">
+                <h3>Peer Comparison</h3>
+                <div id="researchCompareList" class="research-compare-list"></div>
+            </div>
+        </div>
+    </div>
+</div>
 
 </body>
 </html>
