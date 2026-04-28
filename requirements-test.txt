@@ -1,0 +1,12 @@
+# Minimal deps for `pytest` on the API (and CI). For ingest + spaCy, use requirements.txt
+fastapi==0.136.0
+httpx==0.28.1
+pytest==8.3.5
+python-dotenv==1.1.0
+neo4j==6.1.0
+# Minimal deps for `pytest` on the API (and CI). For ingest + spaCy, use requirements.txt
+fastapi==0.136.0
+httpx==0.28.1
+pytest==8.3.5
+python-dotenv==1.1.0
+neo4j==6.1.0
