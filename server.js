@@ -5,7 +5,7 @@ const express = require("express");
 
 const PORT_START = Number(process.env.PORT) || 3000;
 const PORT_MAX_TRIES = 25;
-const FRONTEND = path.join(__dirname, "432Project-main", "Frontend");
+const FRONTEND = path.join(__dirname, "Frontend");
 const FINNHUB_BASE = "https://finnhub.io/api/v1";
 const token = (process.env.FINNHUB_API_KEY || "").trim();
 
@@ -415,6 +415,16 @@ function startListen(port, attempt) {
     }
     if (!token) console.warn("Warning: FINNHUB_API_KEY is not set in .env");
   });
+  return srv;
 }
 
-startListen(PORT_START, 0);
+if (require.main === module) {
+  startListen(PORT_START, 0);
+}
+
+module.exports = {
+  app,
+  yahooChartSymbol,
+  filterCandlesByRange,
+  startListen,
+};
