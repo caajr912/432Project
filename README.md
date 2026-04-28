@@ -139,6 +139,34 @@ Interactive docs at http://localhost:8000/docs
 
 ---
 
+## Running tests
+
+From the repo root (`432Project/`). You do **not** need Neo4j running for these — the FastAPI tests mock the database layer.
+
+### Node (Express `server.js` helpers)
+
+Uses built-in [`node:test`](https://nodejs.org/api/test.html) on chart helper functions.
+
+```bash
+npm install
+npm test
+```
+
+### Python (FastAPI `api/`)
+
+Uses [`pytest`](https://pytest.org/) and `httpx` via `TestClient`.
+
+```bash
+pip install -r requirements-test.txt
+python -m pytest -v
+```
+
+### CI
+
+On every push and pull request, GitHub Actions runs the same checks: `pytest` (Python 3.12) and `npm ci` + `npm test` (Node 20). See `.github/workflows/ci.yml`.
+
+---
+
 ## Project structure
 
 ```
