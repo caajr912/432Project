@@ -7,7 +7,7 @@
     "dev": "node server.js",
     "dev:static": "serve Frontend -l 3000",
     "test": "node --test test/server.test.cjs",
-    "api": ".\\.venv\\Scripts\\python.exe -m uvicorn api.main:app --host 127.0.0.1 --port 8000 --reload"
+    "api": "python -m uvicorn api.main:app --host 127.0.0.1 --port 8000 --reload"
   },
   "keywords": [],
   "author": "",

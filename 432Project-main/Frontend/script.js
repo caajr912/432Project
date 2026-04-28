@@ -11,6 +11,12 @@ let cacheKgArticles = [];
 let cacheKgLoadError = "";
 /** One entry per scatter point — aligned with scatter dataset `data` */
 let cacheScatterMeta = [];
+/** Click-to-open state for KG dot tooltip (prevents hover from showing it). */
+let kgTooltipArmed = false;
+/** Which KG dot is armed (datasetIndex + dataIndex), so hover can't switch it. */
+let kgTooltipArmedKey = null;
+/** Remembers last pointer event type (best-effort, for touch devices). */
+let lastChartPointerEventType = "";
 
 const KG_SCATTER_LABEL = "Graph-linked news (Neo4j)";
 
@@ -357,6 +363,8 @@ function applyChartAndTable() {
           tension: 0.25,
           fill: false,
           pointRadius: denseMonth ? 3 : 5,
+          pointHoverRadius: denseMonth ? 3 : 5,
+          pointHitRadius: denseMonth ? 8 : 10,
           pointBackgroundColor: "#16a34a",
           pointBorderColor: "#fff",
           pointBorderWidth: 2,
@@ -370,6 +378,8 @@ function applyChartAndTable() {
           tension: 0.25,
           fill: false,
           pointRadius: denseMonth ? 3 : 5,
+          pointHoverRadius: denseMonth ? 3 : 5,
+          pointHitRadius: denseMonth ? 8 : 10,
           pointBackgroundColor: "#dc2626",
           pointBorderColor: "#fff",
           pointBorderWidth: 2,
@@ -400,8 +410,9 @@ function applyChartAndTable() {
       borderColor: "#fff",
       borderWidth: 2,
       pointRadius: denseMonth ? 5 : 7,
-      pointHoverRadius: 10,
-      pointHitRadius: 16,
+      // Keep hover tight; click still works because hit radius is reasonable.
+      pointHoverRadius: denseMonth ? 6 : 7,
+      pointHitRadius: denseMonth ? 10 : 12,
       order: 10,
     });
   }
@@ -414,19 +425,9 @@ function applyChartAndTable() {
     },
     options: {
       responsive: true,
-<<<<<<< HEAD
+      // Keep hover behavior tight so tooltips don't "grab" a wide x-range.
       interaction: { mode: "nearest", intersect: true },
       hover: { mode: "nearest", intersect: true },
-      onClick(event, elements, c) {
-        if (elements.length === 0) {
-          c.setActiveElements([]);
-          if (c.tooltip) c.tooltip.setActiveElements([], { x: 0, y: 0 });
-          c.update();
-        }
-      },
-=======
-      interaction: { mode: "index", intersect: false },
->>>>>>> 0731a710a13b87265fe0a4274775c8dcc9d5cf16
       elements: {
         point: {
           hoverRadius: 0,
@@ -435,6 +436,43 @@ function applyChartAndTable() {
         line: {
           hoverBorderWidth: 0,
         },
+      },
+      onHover(e) {
+        lastChartPointerEventType = e?.type || "";
+      },
+      onClick(event, elements, c) {
+        lastChartPointerEventType = event?.type || "click";
+        const hit = Array.isArray(elements) && elements.length > 0 ? elements[0] : null;
+        const dsLabel =
+          hit && c && c.data && c.data.datasets && c.data.datasets[hit.datasetIndex]
+            ? c.data.datasets[hit.datasetIndex].label
+            : "";
+
+        // Only "arm" KG tooltip when a KG dot was actually clicked/tapped.
+        kgTooltipArmed = dsLabel === KG_SCATTER_LABEL;
+        kgTooltipArmedKey = kgTooltipArmed && hit ? { datasetIndex: hit.datasetIndex, dataIndex: hit.index } : null;
+
+        // Clicking empty space should dismiss tooltip/active elements and disarm KG tooltip.
+        if (!hit) {
+          try {
+            c.setActiveElements([]);
+            if (c.tooltip) c.tooltip.setActiveElements([], { x: 0, y: 0 });
+            c.update();
+          } catch {}
+          return;
+        }
+
+        // For KG dots, force the tooltip to show on click (since hover is disabled for KG by filter()).
+        if (kgTooltipArmed) {
+          try {
+            c.setActiveElements(elements);
+            if (c.tooltip) c.tooltip.setActiveElements(elements, { x: event.x, y: event.y });
+            // Force an immediate render on click (some Chart.js builds otherwise wait for a move event).
+            if (c.tooltip && typeof c.tooltip.update === "function") c.tooltip.update(true);
+            c.update();
+            if (typeof c.draw === "function") c.draw();
+          } catch {}
+        }
       },
       plugins: {
         legend: {
@@ -448,27 +486,25 @@ function applyChartAndTable() {
           },
         },
         tooltip: {
-<<<<<<< HEAD
+          // Default: hover tooltips should be precise.
           mode: "nearest",
           intersect: true,
-          events: ["click", "touchstart"],
-          callbacks: {
-            title(items) {
-              if (!items.length) return "";
-              const raw = items[0].raw;
-              if (raw && raw.x != null) return String(raw.x);
-              const lab = items[0].chart?.data?.labels;
-              const di = items[0].dataIndex;
-              if (lab && lab[di] != null) return String(lab[di]);
-              return "";
-=======
-          mode: "index",
-          intersect: false,
+          // Ensure click immediately triggers tooltip evaluation/render.
+          events: ["mousemove", "mouseout", "click", "touchstart", "touchmove"],
           callbacks: {
             title(items) {
               if (!items || items.length === 0) return "";
-              return chartTimestamp(timestamps[items[0].dataIndex]);
->>>>>>> 0731a710a13b87265fe0a4274775c8dcc9d5cf16
+              const first = items[0];
+              // Scatter dots have their own indexing, so `dataIndex` does NOT line up with candle timestamps.
+              // For KG dots, show the article's published date (or the x-label) instead of a candle timestamp.
+              if (first.dataset && first.dataset.label === KG_SCATTER_LABEL) {
+                const meta = cacheScatterMeta[first.dataIndex];
+                const pd = meta && meta.published_date ? String(meta.published_date).slice(0, 10) : "";
+                if (pd) return `Published: ${pd}`;
+                const rawX = first.raw && first.raw.x != null ? String(first.raw.x) : "";
+                return rawX || "Published";
+              }
+              return chartTimestamp(timestamps[first.dataIndex]);
             },
             label(ctx) {
               if (ctx.dataset.label === KG_SCATTER_LABEL) {
@@ -491,6 +527,14 @@ function applyChartAndTable() {
               }
               return "";
             },
+          },
+          // Only show KG dot details on click/tap; allow normal hover tooltips for other datasets.
+          filter(item) {
+            if (item?.dataset?.label !== KG_SCATTER_LABEL) return true;
+            // Click-to-open: allow ONLY the specific dot that was clicked to show details.
+            // This remains true even after mousemove events, until the user clicks elsewhere.
+            if (!kgTooltipArmed || !kgTooltipArmedKey) return false;
+            return item.datasetIndex === kgTooltipArmedKey.datasetIndex && item.dataIndex === kgTooltipArmedKey.dataIndex;
           },
         },
       },
@@ -1290,3 +1334,24 @@ async function fetchMarkets(){
     renderSentiment(sentiment);
   }catch(e){ console.error('fetchMarkets expanded failed', e); document.getElementById('indicesGrid').innerText='Could not load indices'; document.getElementById('moversTable').innerText='Could not load movers'; }
 }
+
+// Expose handlers used by inline HTML attributes (onclick/onchange).
+// This avoids "ReferenceError: <fn> is not defined" if the script scope changes.
+(function exposeInlineHandlers() {
+  const fns = [
+    "getStock",
+    "showView",
+    "onTickerSelect",
+    "loadResearch",
+    "setResearchTicker",
+    "setResearchRange",
+  ];
+  for (const name of fns) {
+    try {
+      const fn = typeof globalThis[name] === "function" ? globalThis[name] : (typeof eval(name) === "function" ? eval(name) : null);
+      if (typeof fn === "function") globalThis[name] = fn;
+    } catch {
+      // ignore missing names
+    }
+  }
+})();
