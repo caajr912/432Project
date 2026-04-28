@@ -132,12 +132,26 @@ async function fetchDailyCandles(symbol, fromSec, toSec) {
 }
 
 app.get("/api/quote", async (req, res) => {
-  if (!token) return res.status(500).json({ error: "Missing FINNHUB_API_KEY in .env" });
   const symbol = String(req.query.symbol || "")
     .trim()
     .toUpperCase();
   if (!symbol) return res.status(400).json({ error: "symbol required" });
   try {
+    if (!token) {
+      const to = Math.floor(Date.now() / 1000);
+      const from = to - 30 * 24 * 60 * 60;
+      const candles = await fetchDailyCandles(symbol, from, to);
+      if (!candles || candles.s !== "ok" || !Array.isArray(candles.c) || candles.c.length === 0) {
+        return res.status(404).json({ error: "No quote data available" });
+      }
+      const last = candles.c[candles.c.length - 1];
+      const prev = candles.c.length > 1 ? candles.c[candles.c.length - 2] : last;
+      const high = candles.h[candles.h.length - 1] ?? last;
+      const low = candles.l[candles.l.length - 1] ?? last;
+      const change = last - prev;
+      const changePercent = prev ? (change / prev) * 100 : 0;
+      return res.json({ c: last, h: high, l: low, o: candles.o[candles.o.length - 1] ?? last, pc: prev, d: change, dp: changePercent, t: candles.t[candles.t.length - 1], v: candles.v[candles.v.length - 1] ?? null });
+    }
     await forwardJson(res, finnhubUrl("/quote", { symbol }));
   } catch (e) {
     res.status(500).json({ error: String(e.message || e) });
@@ -228,11 +242,11 @@ app.get("/api/kg/chart-articles", async (req, res) => {
 });
 
 app.get("/api/news", async (req, res) => {
-  if (!token) return res.status(500).json({ error: "Missing FINNHUB_API_KEY in .env" });
   const symbol = String(req.query.symbol || "")
     .trim()
     .toUpperCase();
   if (!symbol) return res.status(400).json({ error: "symbol required" });
+  if (!token) return res.json([]);
   const to = new Date();
   const from = new Date();
   from.setDate(from.getDate() - 30);
@@ -249,11 +263,11 @@ app.get("/api/news", async (req, res) => {
 });
 
 app.get("/api/profile", async (req, res) => {
-  if (!token) return res.status(500).json({ error: "Missing FINNHUB_API_KEY in .env" });
   const symbol = String(req.query.symbol || "")
     .trim()
     .toUpperCase();
   if (!symbol) return res.status(400).json({ error: "symbol required" });
+  if (!token) return res.json({});
   try {
     await forwardJson(res, finnhubUrl("/stock/profile2", { symbol }));
   } catch (e) {
@@ -262,11 +276,11 @@ app.get("/api/profile", async (req, res) => {
 });
 
 app.get("/api/metric", async (req, res) => {
-  if (!token) return res.status(500).json({ error: "Missing FINNHUB_API_KEY in .env" });
   const symbol = String(req.query.symbol || "")
     .trim()
     .toUpperCase();
   if (!symbol) return res.status(400).json({ error: "symbol required" });
+  if (!token) return res.json({ metric: {} });
   try {
     await forwardJson(res, finnhubUrl("/stock/metric", { symbol, metric: "all" }));
   } catch (e) {
@@ -291,6 +305,131 @@ app.get("/api/nyt-headlines", async (req, res) => {
       res.json(headlines);
       db.close();
     });
+  } catch (e) {
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+
+/** Markets endpoints - lightweight Yahoo-based fallbacks for indices and movers */
+app.get("/api/indices", async (req, res) => {
+  try {
+    // Common index tickers (Yahoo uses ^ prefix)
+    const symbols = ["^GSPC", "^DJI", "^IXIC"].join(",");
+    const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(
+      symbols
+    )}`;
+    const r = await fetch(url, { headers: { Accept: "application/json", "User-Agent": "Mozilla/5.0 (compatible; 432Project/1.0)" } });
+    if (r.ok) {
+      const j = await r.json();
+      const quotes = (j.quoteResponse?.result || []).map((q) => ({
+        symbol: q.symbol,
+        price: q.regularMarketPrice,
+        change: q.regularMarketChange,
+        changePercent: q.regularMarketChangePercent,
+        marketState: q.marketState,
+      }));
+      return res.json({ indices: quotes });
+    }
+
+    // Fallback: Yahoo quote blocked for indices — use common ETFs as proxies (SPY, DIA, QQQ)
+    const fallback = ["SPY", "DIA", "QQQ"];
+    const fUrl = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(fallback.join(","))}`;
+    const fr = await fetch(fUrl, { headers: { Accept: "application/json", "User-Agent": "Mozilla/5.0 (compatible; 432Project/1.0)" } });
+    if (fr.ok) {
+      const fj = await fr.json();
+      const map = { SPY: "^GSPC", DIA: "^DJI", QQQ: "^IXIC" };
+      const quotes = (fj.quoteResponse?.result || []).map((q) => ({
+        symbol: map[q.symbol] || q.symbol,
+        price: q.regularMarketPrice,
+        change: q.regularMarketChange,
+        changePercent: q.regularMarketChangePercent,
+        marketState: q.marketState,
+      }));
+      return res.json({ indices: quotes });
+    }
+
+    // As final fallback compute latest close from daily candles for ETF proxies
+    const etfs = ["SPY","DIA","QQQ"];
+    const out = [];
+    const to = Math.floor(Date.now()/1000);
+    const from = to - 7*24*60*60;
+    for (const s of etfs){
+      try{
+        const c = await fetchDailyCandles(s, from, to);
+        if (c && Array.isArray(c.c) && c.c.length>0){
+          const last = c.c[c.c.length-1];
+          const prev = c.c[c.c.length-2] || last;
+          out.push({ symbol: s === 'SPY'? '^GSPC': s === 'DIA'? '^DJI': '^IXIC', price: last, change: last - prev, changePercent: prev?((last-prev)/prev)*100:0 });
+        }
+      }catch(e){ }
+    }
+    if (out.length>0) return res.json({ indices: out });
+
+    return res.status(502).json({ error: "Yahoo quote fetch failed for indices" });
+  } catch (e) {
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+
+app.get("/api/movers", async (req, res) => {
+  try {
+    // Optional symbols query (comma-separated); otherwise use a set of large-cap stocks
+    const q = String(req.query.symbols || "").trim();
+    const defaults = ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "TSLA", "JPM", "XOM", "V"];
+    const symbols = q ? q.split(",").map((s) => s.trim()).filter(Boolean) : defaults;
+    const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(symbols.join(","))}`;
+    const r = await fetch(url, { headers: { Accept: "application/json", "User-Agent": "Mozilla/5.0 (compatible; 432Project/1.0)" } });
+    if (r.ok) {
+      const j = await r.json();
+      const results = (j.quoteResponse?.result || []).map((q) => ({
+        symbol: q.symbol,
+        price: q.regularMarketPrice,
+        change: q.regularMarketChange,
+        changePercent: q.regularMarketChangePercent,
+      }));
+      // sort by percent change
+      const sorted = results.slice().sort((a, b) => (b.changePercent || 0) - (a.changePercent || 0));
+      const gainers = sorted.slice(0, 5);
+      const losers = sorted.slice(-5).reverse();
+      return res.json({ gainers, losers });
+    }
+
+    // Yahoo failed; compute movers from recent candles as fallback
+    const compute = async (symList) => {
+      const out = [];
+      const to = Math.floor(Date.now() / 1000);
+      const from = to - 10 * 24 * 60 * 60;
+      for (const s of symList) {
+        try {
+          const c = await fetchDailyCandles(s, from, to);
+          if (c && Array.isArray(c.c) && c.c.length >= 2) {
+            const last = c.c[c.c.length - 1];
+            const prev = c.c[c.c.length - 2] || last;
+            const change = last - prev;
+            const changePercent = prev ? (change / prev) * 100 : 0;
+            out.push({ symbol: s, price: last, change, changePercent });
+          }
+        } catch (err) {
+          // ignore
+        }
+      }
+      return out;
+    };
+
+    const fallbackResults = await compute(symbols);
+    const sortedFallback = fallbackResults.slice().sort((a, b) => (b.changePercent || 0) - (a.changePercent || 0));
+    const gainers = sortedFallback.slice(0, 5);
+    const losers = sortedFallback.slice(-5).reverse();
+    return res.json({ gainers, losers });
+  } catch (e) {
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+
+app.get("/api/market-sentiment", async (req, res) => {
+  try {
+    // Lightweight placeholder: return mixed sentiment. Can be replaced with NER/sentiment aggregation later.
+    res.json({ sentiment: "mixed", score: 0.05 });
   } catch (e) {
     res.status(500).json({ error: String(e.message || e) });
   }

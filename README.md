@@ -14,6 +14,7 @@ A data pipeline and knowledge graph system that correlates general world news (N
 | Staging DB | SQLite |
 | NER | spaCy (`en_core_web_sm`) |
 | Sentiment | VADER |
+| LLM Enrichment | Google Gemini |
 | News API | NYT Top Stories |
 | Stock API | Finnhub (paid) / Yahoo Finance (free fallback) |
 
@@ -45,6 +46,7 @@ cd 432Project
 
 ```bash
 pip install -r requirements.txt
+pip install google-generativeai
 python -m spacy download en_core_web_sm
 ```
 
@@ -67,9 +69,11 @@ cp .env.example .env
 ```
 FINNHUB_API_KEY=your_finnhub_key
 NYT_API_KEY=your_nyt_key
-NEO4J_URI=bolt://localhost:7687
+NEO4J_URI=neo4j://127.0.0.1:7687
 NEO4J_USER=neo4j
 NEO4J_PASSWORD=your_neo4j_password
+GEMINI_API_KEY=your_gemini_api_key     # get from aistudio.google.com (free)
+GEMINI_MODEL=gemini-3.1-flash-lite-preview
 PORT=3000
 ```
 
@@ -77,26 +81,28 @@ PORT=3000
 
 ### 5. Start Neo4j
 
-Open Neo4j Desktop and start your local database instance. It should be running on `bolt://localhost:7687` by default.
+Open Neo4j Desktop and start your local database instance. The default database name is `neo4j` — do not rename it. Connection should be on `neo4j://127.0.0.1:7687` by default.
 
 ### 6. Get API keys
 
 - **NYT**: https://developer.nytimes.com — create an app, enable **Top Stories API** under the APIs tab
 - **Finnhub**: https://finnhub.io — free tier works (stock candles fall back to Yahoo Finance automatically)
+- **Gemini**: https://aistudio.google.com — create a project and generate an API key (free tier is sufficient)
 
 ---
 
 ## Running the ingestion pipeline
 
 ```bash
-# Run everything (news + stocks)
+# Full pipeline: NYT -> stocks -> NER -> Gemini enrichment -> Neo4j graph
 python ingest/run.py
 
-# News only
-python ingest/run.py --only nyt
-
-# Stocks only
-python ingest/run.py --only stocks
+# Individual steps
+python ingest/run.py --only nyt        # headlines only
+python ingest/run.py --only stocks     # stock candles only
+python ingest/run.py --only ner        # NER + sentiment pass
+python ingest/run.py --only gemini     # Gemini LLM enrichment pass
+python ingest/run.py --only graph      # write to Neo4j
 
 # Specific tickers
 python ingest/run.py --only stocks --tickers AAPL TSLA NVDA
@@ -105,7 +111,31 @@ python ingest/run.py --only stocks --tickers AAPL TSLA NVDA
 python ingest/run.py --only stocks --lookback 90
 ```
 
-Ingested data is stored in `data/staging.db` (SQLite). This directory is gitignored.
+Ingested data is stored in `data/staging.db` (SQLite). This directory is gitignored — run ingestion locally after setup.
+
+> **Run the full pipeline daily** to accumulate data and improve correlation signal.
+
+---
+
+## Running the API
+
+```bash
+python -m uvicorn api.main:app --reload
+```
+
+API runs at http://localhost:8000
+Interactive docs at http://localhost:8000/docs
+
+### Endpoints
+
+| Endpoint | Description |
+|---|---|
+| `GET /health` | Health check |
+| `GET /api/tickers` | List available tickers |
+| `GET /api/articles` | Headlines (filter by ?section= or ?sentiment=positive/negative/neutral) |
+| `GET /api/prices/{ticker}` | Price history (?days=30) |
+| `GET /api/graph/{ticker}` | Knowledge graph nodes + edges for a ticker |
+| `GET /api/correlate/{ticker}` | Sentiment vs price correlation (?window_days=3) |
 
 ---
 
@@ -113,15 +143,20 @@ Ingested data is stored in `data/staging.db` (SQLite). This directory is gitigno
 
 ```
 432Project/
+├── api/
+│   ├── __init__.py
+│   └── main.py        # FastAPI backend
 ├── ingest/
 │   ├── db.py          # SQLite schema + connection helper
 │   ├── nyt.py         # NYT Top Stories fetcher
 │   ├── stocks.py      # Finnhub/Yahoo Finance candle fetcher
-│   └── run.py         # CLI entry point for ingestion
+│   ├── ner.py         # spaCy NER + VADER sentiment pass
+│   ├── gemini.py      # Gemini LLM enrichment pass
+│   └── run.py         # CLI entry point for full pipeline
 ├── 432Project-main/
-│   └── Frontend/      # HTML/CSS/JS frontend (current demo)
+│   └── Frontend/      # HTML/CSS/JS frontend
 ├── data/              # SQLite staging DB (gitignored)
-├── server.js          # Node/Express dev server (proxies Finnhub)
+├── server.js          # Node/Express dev server (legacy scaffold)
 ├── requirements.txt   # Python dependencies
 ├── package.json       # Node dependencies
 ├── .env.example       # Environment variable template
@@ -149,6 +184,11 @@ Finnhub / Yahoo Finance ─────────────────┘
                                (spaCy + VADER)
                                           │
                                           ▼
+                             Gemini LLM Enrichment pass
+                          (entity extraction, macro classification,
+                           sector tagging, relationship extraction)
+                                          │
+                                          ▼
                                    Neo4j / Neptune
                                (knowledge graph)
                                           │
@@ -160,22 +200,21 @@ Finnhub / Yahoo Finance ─────────────────┘
                              (graph viz + stock charts)
 ```
 
-## Running the API
+---
 
-```bash
-python -m uvicorn api.main:app --reload
-```
+## How the pipeline works
 
-API runs at http://localhost:8000
-Interactive docs at http://localhost:8000/docs
+1. **NYT ingestion** — pulls top stories from business, technology, world, and US sections. Stores headline, abstract, URL, and publish date in SQLite.
 
-### Endpoints
-- `GET /api/tickers` — available tickers
-- `GET /api/articles` — headlines (filter by ?section= or ?sentiment=)
-- `GET /api/prices/{ticker}` — price history (?days=30)
-- `GET /api/graph/{ticker}` — knowledge graph nodes + edges for a ticker
-- `GET /api/correlate/{ticker}` — sentiment vs price correlation (?window_days=3)
-- `GET /health` — health check
+2. **Stock ingestion** — pulls 1 year of daily OHLCV candles for 10 stocks and 3 market indexes (S&P 500, Dow, Nasdaq) via Yahoo Finance.
+
+3. **NER + sentiment** — spaCy extracts named entities (companies, people, places) from each headline. VADER scores sentiment from -1.0 to +1.0.
+
+4. **Gemini enrichment** — Gemini LLM refines entity extraction, classifies macro market impact (Fed policy, inflation, geopolitical risk), tags affected sectors, and extracts the core market-relevant relationship from each headline. This step links broad news to indexes even when no index is explicitly named.
+
+5. **Graph writer** — pushes all data into Neo4j as a knowledge graph: Article -> MENTIONS -> Entity -> MAPS_TO -> Ticker -> HAD_PRICE -> Price.
+
+6. **Correlation** — the /api/correlate/{ticker} endpoint queries the graph to find all articles linked to a ticker, measures the stock price change in the N days following each article, and computes Pearson correlation between sentiment and price movement.
 
 ---
 
@@ -188,6 +227,7 @@ Interactive docs at http://localhost:8000/docs
 
 ## Notes
 
-- `data/` is gitignored — each developer runs ingestion locally
-- The Node `server.js` is a frontend demo scaffold and will be replaced by FastAPI
-- Neo4j Desktop is used for local dev; Amazon Neptune is the production target. Both speak openCypher so queries port with minimal changes.
+- `data/` is gitignored — each developer runs ingestion locally after cloning
+- The Node `server.js` is a legacy frontend scaffold — the FastAPI backend replaces it
+- Neo4j Desktop is used for local dev; Amazon Neptune is the production target. Both speak openCypher so queries port with minimal changes
+- Correlation signal improves with more data — run the pipeline daily in the days leading up to the demo
