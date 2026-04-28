@@ -5,19 +5,9 @@
   "main": "index.js",
   "scripts": {
     "dev": "node server.js",
-<<<<<<< HEAD
-<<<<<<< HEAD
     "dev:static": "serve 432Project-main/Frontend -l 3000",
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "api": ".\\.venv\\Scripts\\python.exe -m uvicorn api.main:app --host 127.0.0.1 --port 8000 --reload"
-=======
-    "dev:static": "serve Frontend -l 3000",
-    "test": "node --test test/server.test.cjs"
->>>>>>> d50620334d5f8151b9c6b2b46ee7f086b6610641
-=======
-    "dev:static": "serve 432Project-main/Frontend -l 3000",
-    "test": "echo \"Error: no test specified\" && exit 1"
->>>>>>> parent of d506203 (Merge pull request #8 from caajr912/testingpipeline)
+    "api": ".\\.venv\\Scripts\\python.exe -m uvicorn api.main:app --host 127.0.0.1 --port 8000 --reload",
+    "test": "node --test"
   },
   "keywords": [],
   "author": "",
