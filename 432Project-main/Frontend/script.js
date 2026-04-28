@@ -14,6 +14,43 @@ let cacheScatterMeta = [];
 
 const KG_SCATTER_LABEL = "Graph-linked news (Neo4j)";
 
+const API_BASE = "http://localhost:8000";
+
+// Convert FastAPI /api/prices/{ticker} response to the Finnhub-style candle object
+// used throughout the chart layer: { s, t, o, h, l, c, v }
+function pricesToCandles(response) {
+  if (!response || !Array.isArray(response.prices) || response.prices.length === 0) {
+    return { s: "no_data", t: [], o: [], h: [], l: [], c: [], v: [] };
+  }
+  const prices = response.prices;
+  return {
+    s: "ok",
+    t: prices.map(p => Math.floor(new Date(p.date + "T21:00:00Z").getTime() / 1000)),
+    o: prices.map(p => p.open),
+    h: prices.map(p => p.high),
+    l: prices.map(p => p.low),
+    c: prices.map(p => p.close),
+    v: prices.map(p => p.volume),
+  };
+}
+
+// Derive a Finnhub-style quote object from the most recent price entry
+function latestPriceToQuote(response) {
+  if (!response || !Array.isArray(response.prices) || response.prices.length === 0) {
+    return { c: null, h: null, l: null, o: null, v: null, t: null, dp: null };
+  }
+  const latest = response.prices[response.prices.length - 1];
+  return {
+    c: latest.close,
+    h: latest.high,
+    l: latest.low,
+    o: latest.open,
+    v: latest.volume,
+    t: Math.floor(new Date(latest.date + "T21:00:00Z").getTime() / 1000),
+    dp: latest.pct_change ?? null,
+  };
+}
+
 /** US equity session calendar day for a bar timestamp (matches YYYY-MM-DD headlines). */
 function candleDayNY(tsSec) {
   return new Intl.DateTimeFormat("en-CA", {
@@ -536,26 +573,6 @@ function showView(view) {
   }
 }
 
-async function fetchMarkets() {
-  try {
-    const [indicesRes, moversRes, sentimentRes] = await Promise.all([
-      fetch("/api/indices"),
-      fetch("/api/movers"),
-      fetch("/api/market-sentiment"),
-    ]);
-    const indices = indicesRes.ok ? (await indicesRes.json()).indices || [] : [];
-    const movers = moversRes.ok ? await moversRes.json() : { gainers: [], losers: [] };
-    const sentiment = sentimentRes.ok ? await sentimentRes.json() : { sentiment: "unknown", score: 0 };
-    renderIndices(indices);
-    renderMovers(movers);
-    renderSentiment(sentiment);
-  } catch (e) {
-    document.getElementById("indicesList").innerText = "Could not load indices";
-    document.getElementById("moversList").innerText = "Could not load movers";
-    document.getElementById("marketSentiment").innerText = "Could not load sentiment";
-    console.error(e);
-  }
-}
 
 function renderIndices(list) {
   const el = document.getElementById("indicesList");
@@ -853,15 +870,13 @@ async function renderResearchCompare(currentTicker) {
     el.appendChild(row);
 
     try {
-      const [quoteRes, candlesRes] = await Promise.all([
-        fetch(`/api/quote?symbol=${encodeURIComponent(symbol)}`),
-        fetch(`/api/candles?symbol=${encodeURIComponent(symbol)}`),
-      ]);
-      const quote = quoteRes.ok ? await quoteRes.json() : null;
-      const candles = candlesRes.ok ? await candlesRes.json() : null;
+      const pricesRes = await fetch(`${API_BASE}/api/prices/${encodeURIComponent(symbol)}?days=60`);
+      const pricesData = pricesRes.ok ? await pricesRes.json() : null;
+      const quote = latestPriceToQuote(pricesData);
+      const candles = pricesToCandles(pricesData);
       const priceCell = row.querySelector(".research-compare-price");
       const trendCell = row.querySelector(".research-compare-trend");
-      if (priceCell) priceCell.textContent = quote && quote.c != null ? formatUsd(quote.c) : "—";
+      if (priceCell) priceCell.textContent = quote.c != null ? formatUsd(quote.c) : "—";
       if (trendCell) trendCell.textContent = trendLabel(candles);
       await createSparkline(`researchSpark_${safeId(symbol)}`, candles);
     } catch (err) {
@@ -885,24 +900,20 @@ async function loadResearch() {
   if (subtitle) subtitle.textContent = `Loading research for ${ticker}…`;
 
   try {
-    const [quoteRes, candleRes, newsRes, profileRes, metricRes, nytRes] = await Promise.all([
-      fetch(`/api/quote?symbol=${encodeURIComponent(ticker)}`),
-      fetch(`/api/candles?symbol=${encodeURIComponent(ticker)}`),
-      fetch(`/api/news?symbol=${encodeURIComponent(ticker)}`),
-      fetch(`/api/profile?symbol=${encodeURIComponent(ticker)}`),
-      fetch(`/api/metric?symbol=${encodeURIComponent(ticker)}`),
-      fetch(`/api/nyt-headlines`),
+    const [pricesRes, articlesRes, correlateRes] = await Promise.all([
+      fetch(`${API_BASE}/api/prices/${encodeURIComponent(ticker)}?days=365`),
+      fetch(`${API_BASE}/api/articles?limit=20`),
+      fetch(`${API_BASE}/api/correlate/${encodeURIComponent(ticker)}`),
     ]);
 
-    let quote = null;
-    try { quote = quoteRes.ok ? await quoteRes.json() : null; } catch (err) { quote = null; }
-    const candles = candleRes.ok ? await candleRes.json() : null;
-    const news = newsRes.ok ? await newsRes.json() : [];
-    const profile = profileRes.ok ? await profileRes.json() : null;
-    const metric = metricRes.ok ? await metricRes.json() : null;
-    const nyt = nytRes.ok ? await nytRes.json() : [];
+    const pricesData = pricesRes.ok ? await pricesRes.json() : null;
+    const quote = latestPriceToQuote(pricesData);
+    const candles = pricesToCandles(pricesData);
+    const news = articlesRes.ok ? await articlesRes.json() : [];
+    const correlate = correlateRes.ok ? await correlateRes.json() : null;
+    const nyt = news;
 
-    researchCache = { ticker, quote, candles, news, profile, metric, nyt };
+    researchCache = { ticker, quote, candles, news, profile: null, metric: null, nyt, correlate };
     renderResearchChart(researchCache);
     renderResearchThesis(researchCache);
     renderResearchNews(news, nyt);
@@ -936,51 +947,33 @@ async function getStock() {
   document.getElementById("weekChartSubtitle").textContent = "Loading…";
   document.getElementById("weekTableBody").innerHTML = "";
 
-  const base = "";
-  const q = (path) => `${base}${path}?symbol=${encodeURIComponent(ticker)}`;
-
   try {
-    const [quoteRes, candleRes, newsRes, profileRes, metricRes, kgRes] = await Promise.all([
-      fetch(q("/api/quote")),
-      fetch(q("/api/candles")),
-      fetch(q("/api/news")),
-      fetch(q("/api/profile")),
-      fetch(q("/api/metric")),
-      fetch(q("/api/kg/chart-articles")),
+    const [pricesRes, graphRes, articlesRes] = await Promise.all([
+      fetch(`${API_BASE}/api/prices/${encodeURIComponent(ticker)}?days=365`),
+      fetch(`${API_BASE}/api/graph/${encodeURIComponent(ticker)}`),
+      fetch(`${API_BASE}/api/articles?limit=20`),
     ]);
 
-    // tolerate backend parts failing (e.g., missing FINNHUB key) — prefer rendering candles
-    let quote = null;
-    try {
-      quote = await quoteRes.json();
-    } catch (err) {
-      quote = null;
-    }
-    if (!quoteRes.ok) {
-      console.warn("Quote fetch failed", quote && (quote.error || quote.message));
-      // provide a lightweight placeholder so charts/table can still render from candles
-      quote = quote || { c: null, h: null, l: null };
-    }
+    const pricesData = pricesRes.ok ? await pricesRes.json() : null;
+    const quote = latestPriceToQuote(pricesData);
+    const candles = pricesToCandles(pricesData);
+    const profile = null;
+    const metricPayload = null;
 
-    const candles = candleRes.ok ? await candleRes.json() : null;
-    const news = newsRes.ok ? await newsRes.json() : [];
-    const profile = profileRes.ok ? await profileRes.json() : null;
-    const metricPayload = metricRes.ok ? await metricRes.json() : null;
-
-    let kgRaw = null;
-    try {
-      kgRaw = await kgRes.json();
-    } catch {
-      kgRaw = {};
-    }
-    cacheKgArticles = Array.isArray(kgRaw.articles) ? kgRaw.articles : [];
+    let graphData = null;
+    try { graphData = graphRes.ok ? await graphRes.json() : null; } catch { graphData = null; }
+    cacheKgArticles = graphData && Array.isArray(graphData.nodes)
+      ? graphData.nodes.filter(n => n.type === "Article")
+      : [];
     cacheKgLoadError = "";
-    if (!kgRes.ok) {
-      cacheKgLoadError =
-        kgRaw && kgRaw.error != null
-          ? String(kgRaw.error)
-          : `Could not reach KG API (HTTP ${kgRes.status}). Start FastAPI: uvicorn api.main:app --host 127.0.0.1 --port 8000`;
+    // 404 = no articles linked to this ticker in the graph — not an error
+    if (!graphRes.ok && graphRes.status !== 404) {
+      cacheKgLoadError = graphData && graphData.detail != null
+        ? String(graphData.detail)
+        : `Could not reach graph API (HTTP ${graphRes.status}). Start FastAPI: uvicorn api.main:app --host 127.0.0.1 --port 8000`;
     }
+
+    const news = articlesRes.ok ? await articlesRes.json() : [];
 
     const price = quote.c;
     document.getElementById("price").innerText =
@@ -1014,7 +1007,7 @@ async function getStock() {
         title.textContent = article.headline || article.summary || "—";
         const dateEl = document.createElement("p");
         dateEl.className = "news-date";
-        dateEl.textContent = newsDate(article.datetime);
+        dateEl.textContent = newsDate(article.datetime || article.published_date);
         div.appendChild(title);
         div.appendChild(dateEl);
         newsList.appendChild(div);
@@ -1103,8 +1096,8 @@ async function renderIndicesExpanded(indices){
     // fetch candles for mini chart
     (async ()=>{
       try{
-        const r = await fetch(`/api/candles?symbol=${encodeURIComponent(sym)}`);
-        const cj = r.ok? await r.json(): null;
+        const r = await fetch(`${API_BASE}/api/prices/${encodeURIComponent(sym)}?days=30`);
+        const cj = r.ok ? pricesToCandles(await r.json()) : null;
         await createMiniChart(`mini_${idSafe}`, cj);
       }catch(e){ console.warn('mini chart fetch failed', sym, e); }
     })();
@@ -1126,8 +1119,8 @@ async function renderMoversExpanded(payload){
       el.appendChild(row);
       (async ()=>{
         try{
-          const r = await fetch(`/api/candles?symbol=${encodeURIComponent(it.symbol)}`);
-          const cj = r.ok? await r.json(): null;
+          const r = await fetch(`${API_BASE}/api/prices/${encodeURIComponent(it.symbol)}?days=30`);
+          const cj = r.ok ? pricesToCandles(await r.json()) : null;
           await createSparkline(`spark_${idSafe}`, cj);
         }catch(e){ console.warn('spark fetch failed', it.symbol, e); }
       })();
@@ -1242,26 +1235,73 @@ function renderSectorHeatmap() {
   }
 }
 
-// enhance fetchMarkets to use expanded renderers
-async function fetchMarkets(){
-  try{
-    const [indicesRes, moversRes, sentimentRes] = await Promise.all([
-      fetch('/api/indices'), fetch('/api/movers'), fetch('/api/market-sentiment')
-    ]);
-    const indices = indicesRes.ok? (await indicesRes.json()).indices || [] : [];
-    const movers = moversRes.ok? await moversRes.json() : {gainers:[], losers:[]};
-    const sentiment = sentimentRes.ok? await sentimentRes.json() : {sentiment:'unknown', score:0};
-    
-    // Render all visual elements
+async function fetchMarkets() {
+  try {
+    const tickerList = await fetch(`${API_BASE}/api/tickers`).then(r => r.ok ? r.json() : []);
+
+    // Fetch recent prices per ticker — 10 days covers weekends and holidays
+    const priceResults = await Promise.all(
+      tickerList.map(sym =>
+        fetch(`${API_BASE}/api/prices/${encodeURIComponent(sym)}?days=10`)
+          .then(r => r.ok ? r.json() : null)
+          .catch(() => null)
+      )
+    );
+
+    const allItems = [];
+    tickerList.forEach((sym, i) => {
+      const data = priceResults[i];
+      if (!data || !Array.isArray(data.prices) || data.prices.length === 0) return;
+      const latest = data.prices[data.prices.length - 1];
+      allItems.push({
+        symbol: sym,
+        price: latest.close,
+        changePercent: latest.pct_change ?? null,
+        change: latest.pct_change != null && latest.close != null
+          ? parseFloat((latest.close * latest.pct_change / 100).toFixed(2))
+          : null,
+      });
+    });
+
+    // Separate index tickers (start with ^) from regular stocks
+    const indices = allItems.filter(it => it.symbol.startsWith("^"));
+    const stocks = allItems.filter(it => !it.symbol.startsWith("^"));
+    const displayIndices = indices.length > 0 ? indices : allItems.slice(0, 4);
+
+    const sortedStocks = [...(stocks.length > 0 ? stocks : allItems)]
+      .sort((a, b) => (b.changePercent ?? -Infinity) - (a.changePercent ?? -Infinity));
+    const movers = {
+      gainers: sortedStocks.slice(0, 5),
+      losers: [...sortedStocks].reverse().slice(0, 5),
+    };
+
+    // Market sentiment from /api/correlate on the first available ticker
+    let sentiment = { sentiment: "unknown", score: 0 };
+    if (tickerList.length > 0) {
+      const corrTicker = stocks[0]?.symbol || tickerList[0];
+      const corrRes = await fetch(`${API_BASE}/api/correlate/${encodeURIComponent(corrTicker)}`);
+      if (corrRes.ok) {
+        const corr = await corrRes.json();
+        const r = corr.correlation ?? 0;
+        sentiment = {
+          sentiment: r > 0.2 ? "positive" : r < -0.2 ? "negative" : "neutral",
+          score: r,
+        };
+      }
+    }
+
     updateMarketStatus();
     updateVIX();
     updateMarketBreadth();
     renderSectorHeatmap();
-    
-    await renderIndicesExpanded(indices);
+    await renderIndicesExpanded(displayIndices);
     await renderMoversExpanded(movers);
     renderSentiment(sentiment);
-  }catch(e){ console.error('fetchMarkets expanded failed', e); document.getElementById('indicesGrid').innerText='Could not load indices'; document.getElementById('moversTable').innerText='Could not load movers'; }
+  } catch (e) {
+    console.error("fetchMarkets failed", e);
+    document.getElementById("indicesGrid").innerText = "Could not load indices";
+    document.getElementById("moversTable").innerText = "Could not load movers";
+  }
 }
 
 // Expose handlers used by inline HTML attributes (onclick/onchange).
