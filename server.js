@@ -1,5 +1,6 @@
 const path = require("path");
-require("dotenv").config({ path: path.join(__dirname, ".env") });
+// override: true so values from this .env win over empty/preset Windows env vars (e.g. FASTAPI_URL="")
+require("dotenv").config({ path: path.join(__dirname, ".env"), override: true });
 const http = require("http");
 const express = require("express");
 
@@ -8,6 +9,7 @@ const PORT_MAX_TRIES = 25;
 const FRONTEND = path.join(__dirname, "Frontend");
 const FINNHUB_BASE = "https://finnhub.io/api/v1";
 const token = (process.env.FINNHUB_API_KEY || "").trim();
+const FASTAPI_URL = (process.env.FASTAPI_URL || "").trim().replace(/\/$/, "");
 
 /** Finnhub free tier returns 403 on `/stock/candle`; Yahoo chart is used as fallback (no key). */
 const YAHOO_UA =
@@ -198,6 +200,44 @@ app.get("/api/candles-week", async (req, res) => {
     });
   } catch (e) {
     res.status(500).json({ error: String(e.message || e) });
+  }
+});
+
+/** Proxies to FastAPI `GET /api/chart-articles/{symbol}` (Neo4j). Set FASTAPI_URL in .env. */
+app.get("/api/kg/chart-articles", async (req, res) => {
+  const symbol = String(req.query.symbol || "")
+    .trim()
+    .toUpperCase();
+  if (!symbol) return res.status(400).json({ error: "symbol required" });
+  if (!FASTAPI_URL) {
+    return res.json({ ticker: symbol, articles: [] });
+  }
+  try {
+    const url = `${FASTAPI_URL}/api/chart-articles/${encodeURIComponent(symbol)}`;
+    const r = await fetch(url);
+    const text = await r.text();
+    let body;
+    try {
+      body = JSON.parse(text);
+    } catch {
+      return res.status(502).json({ error: "Invalid JSON from FastAPI", ticker: symbol, articles: [] });
+    }
+    if (!r.ok) {
+      const errMsg =
+        typeof body.detail === "string"
+          ? body.detail
+          : Array.isArray(body.detail)
+            ? body.detail.map((d) => d.msg || d).join("; ")
+            : body.error || text || r.statusText;
+      return res.status(r.status >= 400 && r.status < 600 ? r.status : 502).json({
+        error: errMsg,
+        ticker: symbol,
+        articles: Array.isArray(body.articles) ? body.articles : [],
+      });
+    }
+    res.json(body);
+  } catch (e) {
+    res.status(502).json({ error: String(e.message || e), ticker: symbol, articles: [] });
   }
 });
 
@@ -414,6 +454,13 @@ function startListen(port, attempt) {
       console.log(`(Port ${PORT_START} was busy. Set PORT=${port} in .env to skip searching.)`);
     }
     if (!token) console.warn("Warning: FINNHUB_API_KEY is not set in .env");
+    if (FASTAPI_URL) {
+      console.log(`Neo4j chart proxy → ${FASTAPI_URL} (run: uvicorn api.main:app --host 127.0.0.1 --port 8000)`);
+    } else {
+      console.warn(
+        "Neo4j chart proxy off: set FASTAPI_URL in .env (e.g. http://127.0.0.1:8000) and restart this server."
+      );
+    }
   });
   return srv;
 }
