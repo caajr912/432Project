@@ -154,6 +154,37 @@
 
 </div>
 
+<!-- CORRELATION PANEL -->
+<div class="corr-panel" id="corrPanel" style="display:none">
+    <div class="corr-header">
+        <div>
+            <h3>Sentiment vs. Price Movement</h3>
+            <p class="corr-subtitle" id="corrSubtitle"></p>
+        </div>
+        <span class="corr-badge" id="corrBadge"></span>
+    </div>
+    <div class="corr-body">
+        <div class="corr-chart-wrap">
+            <canvas id="corrChart"></canvas>
+        </div>
+        <div class="corr-stats">
+            <div class="corr-stat">
+                <span class="corr-stat-label">Pearson Correlation</span>
+                <span class="corr-stat-value" id="corrCoefficient">—</span>
+            </div>
+            <div class="corr-stat">
+                <span class="corr-stat-label">Agreement Rate</span>
+                <span class="corr-stat-value" id="corrAgreement">—</span>
+            </div>
+            <div class="corr-stat">
+                <span class="corr-stat-label">Articles Analyzed</span>
+                <span class="corr-stat-value" id="corrArticles">—</span>
+            </div>
+            <div class="corr-summary-box" id="corrSummary"></div>
+        </div>
+    </div>
+</div>
+
 </div>
 
 <script src="script.js"></script>

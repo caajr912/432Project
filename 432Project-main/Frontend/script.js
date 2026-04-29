@@ -1,4 +1,5 @@
 let chart;
+let corrChart = null;
 
 /** "week" = last 7 sessions; "month" = daily bars in the last 30 calendar days */
 let chartRangeMode = "week";
@@ -14,7 +15,7 @@ let cacheScatterMeta = [];
 
 const KG_SCATTER_LABEL = "Graph-linked news (Neo4j)";
 
-const API_BASE = "http://localhost:8000";
+const API_BASE = "http://3.133.101.108:8000";
 
 // Convert FastAPI /api/prices/{ticker} response to the Finnhub-style candle object
 // used throughout the chart layer: { s, t, o, h, l, c, v }
@@ -948,10 +949,11 @@ async function getStock() {
   document.getElementById("weekTableBody").innerHTML = "";
 
   try {
-    const [pricesRes, graphRes, articlesRes] = await Promise.all([
+    const [pricesRes, graphRes, articlesRes, correlateRes] = await Promise.all([
       fetch(`${API_BASE}/api/prices/${encodeURIComponent(ticker)}?days=365`),
       fetch(`${API_BASE}/api/graph/${encodeURIComponent(ticker)}`),
       fetch(`${API_BASE}/api/articles?limit=20`),
+      fetch(`${API_BASE}/api/correlate/${encodeURIComponent(ticker)}`),
     ]);
 
     const pricesData = pricesRes.ok ? await pricesRes.json() : null;
@@ -974,6 +976,8 @@ async function getStock() {
     }
 
     const news = articlesRes.ok ? await articlesRes.json() : [];
+    let correlateData = null;
+    try { correlateData = correlateRes.ok ? await correlateRes.json() : null; } catch { correlateData = null; }
 
     const price = quote.c;
     document.getElementById("price").innerText =
@@ -1019,6 +1023,7 @@ async function getStock() {
     cacheCandles = candles;
     applyChartAndTable();
     syncSelectToTicker(ticker);
+    renderCorrelationPanel(correlateData);
   } catch (e) {
     cacheTicker = "";
     cacheQuote = null;
@@ -1030,12 +1035,127 @@ async function getStock() {
     document.getElementById("weekChartSubtitle").textContent =
       "High (green), low (red), trend (blue) — pick 1 week or 1 month after searching";
     document.getElementById("weekTableBody").innerHTML = "";
-    if (chart) {
-      chart.destroy();
-      chart = null;
-    }
+    if (chart) { chart.destroy(); chart = null; }
+    const corrPanel = document.getElementById("corrPanel");
+    if (corrPanel) corrPanel.style.display = "none";
     console.error(e);
   }
+}
+
+function renderCorrelationPanel(data) {
+  const panel = document.getElementById("corrPanel");
+  if (!panel) return;
+
+  if (!data || data.correlation == null || !Array.isArray(data.data_points) || data.data_points.length === 0) {
+    panel.style.display = "none";
+    return;
+  }
+
+  panel.style.display = "block";
+
+  const r = data.correlation;
+
+  const badge = document.getElementById("corrBadge");
+  if (badge) badge.textContent = `r = ${r.toFixed(3)}`;
+
+  const sub = document.getElementById("corrSubtitle");
+  if (sub) sub.textContent = `${data.ticker} · ${data.window_days}-day price window · ${data.total_articles} articles`;
+
+  const pearsonEl = document.getElementById("corrCoefficient");
+  if (pearsonEl) {
+    pearsonEl.textContent = r.toFixed(3);
+    pearsonEl.className = "corr-stat-value " + (r > 0.2 ? "positive" : r < -0.2 ? "negative" : "neutral");
+  }
+
+  const agreeEl = document.getElementById("corrAgreement");
+  if (agreeEl) {
+    agreeEl.textContent = `${data.agreement_rate}%`;
+    agreeEl.className = "corr-stat-value " + (data.agreement_rate >= 55 ? "positive" : data.agreement_rate <= 45 ? "negative" : "neutral");
+  }
+
+  const artEl = document.getElementById("corrArticles");
+  if (artEl) { artEl.textContent = data.total_articles; artEl.className = "corr-stat-value"; }
+
+  const sumEl = document.getElementById("corrSummary");
+  if (sumEl) sumEl.textContent = data.summary;
+
+  // Build two datasets: points where sentiment & price moved together vs apart
+  const aligned = [];
+  const diverged = [];
+  for (const pt of data.data_points) {
+    const point = { x: pt.sentiment, y: pt.price_change, headline: pt.headline, date: pt.published_date };
+    const agrees = (pt.sentiment > 0.05 && pt.price_change > 0) || (pt.sentiment < -0.05 && pt.price_change < 0);
+    (agrees ? aligned : diverged).push(point);
+  }
+
+  const ctx = document.getElementById("corrChart").getContext("2d");
+  if (corrChart) corrChart.destroy();
+
+  corrChart = new Chart(ctx, {
+    type: "scatter",
+    data: {
+      datasets: [
+        {
+          label: "Aligned (sentiment matched price)",
+          data: aligned,
+          backgroundColor: "rgba(126,243,160,0.75)",
+          borderColor: "#7ef3a0",
+          borderWidth: 1,
+          pointRadius: 7,
+          pointHoverRadius: 10,
+        },
+        {
+          label: "Diverged (sentiment vs price)",
+          data: diverged,
+          backgroundColor: "rgba(255,154,154,0.75)",
+          borderColor: "#ff9a9a",
+          borderWidth: 1,
+          pointRadius: 7,
+          pointHoverRadius: 10,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: true,
+          position: "bottom",
+          labels: { color: "#94a3b8", boxWidth: 12, padding: 16, font: { size: 11 } },
+        },
+        tooltip: {
+          callbacks: {
+            label(ctx) {
+              const pt = ctx.raw;
+              return [
+                `Sentiment: ${Number(pt.x).toFixed(3)}`,
+                `Price Δ: ${Number(pt.y).toFixed(2)}%`,
+                pt.date ? `Date: ${pt.date}` : "",
+              ].filter(Boolean);
+            },
+            afterLabel(ctx) {
+              return (ctx.raw.headline || "").slice(0, 90);
+            },
+          },
+        },
+      },
+      scales: {
+        x: {
+          title: { display: true, text: "Article Sentiment Score  (−1 negative → +1 positive)", color: "#64748b", font: { size: 11 } },
+          grid: { color: "rgba(255,255,255,0.05)" },
+          ticks: { color: "#64748b" },
+          min: -1,
+          max: 1,
+        },
+        y: {
+          title: { display: true, text: `Price Change % (${data.window_days}-day window after article)`, color: "#64748b", font: { size: 11 } },
+          grid: { color: "rgba(255,255,255,0.05)" },
+          ticks: { color: "#64748b", callback: v => `${v}%` },
+        },
+      },
+    },
+  });
 }
 
 
