@@ -268,12 +268,62 @@ button:disabled{
 }
 
 .chart-wrap{
+    position: relative;
     width:100%;
     background: rgba(15, 26, 46, 0.6);
     border: 1px solid rgba(0, 255, 204, 0.2);
     border-radius: 8px;
     padding: 16px;
     margin-bottom: 20px;
+}
+
+.stock-chart-html-tooltip{
+    max-width: min(420px, 90vw);
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: rgba(15, 26, 46, 0.96);
+    border: 1px solid rgba(0, 255, 204, 0.35);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    font-family: Inter, sans-serif;
+    font-size: 12px;
+    line-height: 1.35;
+    color: #e2e8f0;
+    transition: opacity 0.12s ease;
+}
+
+.stock-chart-tooltip-title{
+    font-weight: 600;
+    font-size: 11px;
+    color: #00ffcc;
+    margin-bottom: 6px;
+}
+
+.stock-chart-tooltip-headline{
+    margin: 4px 0 6px;
+}
+
+.stock-chart-tooltip-meta{
+    font-size: 11px;
+    color: #94a3b8;
+    margin-bottom: 4px;
+}
+
+.stock-chart-tooltip-row{
+    margin: 2px 0;
+}
+
+.stock-chart-html-tooltip a.stock-chart-tooltip-link{
+    display: inline-block;
+    margin-top: 8px;
+    word-break: break-all;
+    color: #7dd3fc;
+    font-weight: 500;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.stock-chart-html-tooltip a.stock-chart-tooltip-link:hover{
+    color: #bae6fd;
 }
 
 canvas{
