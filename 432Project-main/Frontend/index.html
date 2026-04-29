@@ -12,6 +12,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
 <link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:,">
 
 </head>
 
@@ -56,19 +57,8 @@
                 <option value="NVDA">NVIDIA (NVDA)</option>
                 <option value="TSLA">Tesla (TSLA)</option>
                 <option value="JPM">JPMorgan (JPM)</option>
-                <option value="V">Visa (V)</option>
                 <option value="JNJ">Johnson &amp; Johnson (JNJ)</option>
-                <option value="WMT">Walmart (WMT)</option>
-                <option value="PG">Procter &amp; Gamble (PG)</option>
-                <option value="MA">Mastercard (MA)</option>
-                <option value="UNH">UnitedHealth (UNH)</option>
-                <option value="HD">Home Depot (HD)</option>
-                <option value="DIS">Disney (DIS)</option>
-                <option value="BAC">Bank of America (BAC)</option>
                 <option value="XOM">Exxon Mobil (XOM)</option>
-                <option value="PFE">Pfizer (PFE)</option>
-                <option value="KO">Coca-Cola (KO)</option>
-                <option value="NFLX">Netflix (NFLX)</option>
             </select>
             <div class="search-input-wrap">
                 <input id="ticker" placeholder="Or type a symbol" autocomplete="off">
@@ -162,6 +152,37 @@
         </div>
     </div>
 
+</div>
+
+<!-- CORRELATION PANEL -->
+<div class="corr-panel" id="corrPanel" style="display:none">
+    <div class="corr-header">
+        <div>
+            <h3>Sentiment vs. Price Movement</h3>
+            <p class="corr-subtitle" id="corrSubtitle"></p>
+        </div>
+        <span class="corr-badge" id="corrBadge"></span>
+    </div>
+    <div class="corr-body">
+        <div class="corr-chart-wrap">
+            <canvas id="corrChart"></canvas>
+        </div>
+        <div class="corr-stats">
+            <div class="corr-stat">
+                <span class="corr-stat-label">Pearson Correlation</span>
+                <span class="corr-stat-value" id="corrCoefficient">—</span>
+            </div>
+            <div class="corr-stat">
+                <span class="corr-stat-label">Agreement Rate</span>
+                <span class="corr-stat-value" id="corrAgreement">—</span>
+            </div>
+            <div class="corr-stat">
+                <span class="corr-stat-label">Articles Analyzed</span>
+                <span class="corr-stat-value" id="corrArticles">—</span>
+            </div>
+            <div class="corr-summary-box" id="corrSummary"></div>
+        </div>
+    </div>
 </div>
 
 </div>

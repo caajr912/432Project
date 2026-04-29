@@ -1,4 +1,5 @@
 let chart;
+let corrChart = null;
 
 /** "week" = last 7 sessions; "month" = daily bars in the last 30 calendar days */
 let chartRangeMode = "week";
@@ -11,14 +12,45 @@ let cacheKgArticles = [];
 let cacheKgLoadError = "";
 /** One entry per scatter point — aligned with scatter dataset `data` */
 let cacheScatterMeta = [];
-/** Click-to-open state for KG dot tooltip (prevents hover from showing it). */
-let kgTooltipArmed = false;
-/** Which KG dot is armed (datasetIndex + dataIndex), so hover can't switch it. */
-let kgTooltipArmedKey = null;
-/** Remembers last pointer event type (best-effort, for touch devices). */
-let lastChartPointerEventType = "";
 
 const KG_SCATTER_LABEL = "Graph-linked news (Neo4j)";
+
+const API_BASE = "http://3.133.101.108:8000";
+
+// Convert FastAPI /api/prices/{ticker} response to the Finnhub-style candle object
+// used throughout the chart layer: { s, t, o, h, l, c, v }
+function pricesToCandles(response) {
+  if (!response || !Array.isArray(response.prices) || response.prices.length === 0) {
+    return { s: "no_data", t: [], o: [], h: [], l: [], c: [], v: [] };
+  }
+  const prices = response.prices;
+  return {
+    s: "ok",
+    t: prices.map(p => Math.floor(new Date(p.date + "T21:00:00Z").getTime() / 1000)),
+    o: prices.map(p => p.open),
+    h: prices.map(p => p.high),
+    l: prices.map(p => p.low),
+    c: prices.map(p => p.close),
+    v: prices.map(p => p.volume),
+  };
+}
+
+// Derive a Finnhub-style quote object from the most recent price entry
+function latestPriceToQuote(response) {
+  if (!response || !Array.isArray(response.prices) || response.prices.length === 0) {
+    return { c: null, h: null, l: null, o: null, v: null, t: null, dp: null };
+  }
+  const latest = response.prices[response.prices.length - 1];
+  return {
+    c: latest.close,
+    h: latest.high,
+    l: latest.low,
+    o: latest.open,
+    v: latest.volume,
+    t: Math.floor(new Date(latest.date + "T21:00:00Z").getTime() / 1000),
+    dp: latest.pct_change ?? null,
+  };
+}
 
 /** US equity session calendar day for a bar timestamp (matches YYYY-MM-DD headlines). */
 function candleDayNY(tsSec) {
@@ -363,8 +395,6 @@ function applyChartAndTable() {
           tension: 0.25,
           fill: false,
           pointRadius: denseMonth ? 3 : 5,
-          pointHoverRadius: denseMonth ? 3 : 5,
-          pointHitRadius: denseMonth ? 8 : 10,
           pointBackgroundColor: "#16a34a",
           pointBorderColor: "#fff",
           pointBorderWidth: 2,
@@ -378,8 +408,6 @@ function applyChartAndTable() {
           tension: 0.25,
           fill: false,
           pointRadius: denseMonth ? 3 : 5,
-          pointHoverRadius: denseMonth ? 3 : 5,
-          pointHitRadius: denseMonth ? 8 : 10,
           pointBackgroundColor: "#dc2626",
           pointBorderColor: "#fff",
           pointBorderWidth: 2,
@@ -410,9 +438,8 @@ function applyChartAndTable() {
       borderColor: "#fff",
       borderWidth: 2,
       pointRadius: denseMonth ? 5 : 7,
-      // Keep hover tight; click still works because hit radius is reasonable.
-      pointHoverRadius: denseMonth ? 6 : 7,
-      pointHitRadius: denseMonth ? 10 : 12,
+      pointHoverRadius: 10,
+      pointHitRadius: 16,
       order: 10,
     });
   }
@@ -425,9 +452,7 @@ function applyChartAndTable() {
     },
     options: {
       responsive: true,
-      // Keep hover behavior tight so tooltips don't "grab" a wide x-range.
-      interaction: { mode: "nearest", intersect: true },
-      hover: { mode: "nearest", intersect: true },
+      interaction: { mode: "index", intersect: false },
       elements: {
         point: {
           hoverRadius: 0,
@@ -436,43 +461,6 @@ function applyChartAndTable() {
         line: {
           hoverBorderWidth: 0,
         },
-      },
-      onHover(e) {
-        lastChartPointerEventType = e?.type || "";
-      },
-      onClick(event, elements, c) {
-        lastChartPointerEventType = event?.type || "click";
-        const hit = Array.isArray(elements) && elements.length > 0 ? elements[0] : null;
-        const dsLabel =
-          hit && c && c.data && c.data.datasets && c.data.datasets[hit.datasetIndex]
-            ? c.data.datasets[hit.datasetIndex].label
-            : "";
-
-        // Only "arm" KG tooltip when a KG dot was actually clicked/tapped.
-        kgTooltipArmed = dsLabel === KG_SCATTER_LABEL;
-        kgTooltipArmedKey = kgTooltipArmed && hit ? { datasetIndex: hit.datasetIndex, dataIndex: hit.index } : null;
-
-        // Clicking empty space should dismiss tooltip/active elements and disarm KG tooltip.
-        if (!hit) {
-          try {
-            c.setActiveElements([]);
-            if (c.tooltip) c.tooltip.setActiveElements([], { x: 0, y: 0 });
-            c.update();
-          } catch {}
-          return;
-        }
-
-        // For KG dots, force the tooltip to show on click (since hover is disabled for KG by filter()).
-        if (kgTooltipArmed) {
-          try {
-            c.setActiveElements(elements);
-            if (c.tooltip) c.tooltip.setActiveElements(elements, { x: event.x, y: event.y });
-            // Force an immediate render on click (some Chart.js builds otherwise wait for a move event).
-            if (c.tooltip && typeof c.tooltip.update === "function") c.tooltip.update(true);
-            c.update();
-            if (typeof c.draw === "function") c.draw();
-          } catch {}
-        }
       },
       plugins: {
         legend: {
@@ -486,25 +474,12 @@ function applyChartAndTable() {
           },
         },
         tooltip: {
-          // Default: hover tooltips should be precise.
-          mode: "nearest",
-          intersect: true,
-          // Ensure click immediately triggers tooltip evaluation/render.
-          events: ["mousemove", "mouseout", "click", "touchstart", "touchmove"],
+          mode: "index",
+          intersect: false,
           callbacks: {
             title(items) {
               if (!items || items.length === 0) return "";
-              const first = items[0];
-              // Scatter dots have their own indexing, so `dataIndex` does NOT line up with candle timestamps.
-              // For KG dots, show the article's published date (or the x-label) instead of a candle timestamp.
-              if (first.dataset && first.dataset.label === KG_SCATTER_LABEL) {
-                const meta = cacheScatterMeta[first.dataIndex];
-                const pd = meta && meta.published_date ? String(meta.published_date).slice(0, 10) : "";
-                if (pd) return `Published: ${pd}`;
-                const rawX = first.raw && first.raw.x != null ? String(first.raw.x) : "";
-                return rawX || "Published";
-              }
-              return chartTimestamp(timestamps[first.dataIndex]);
+              return chartTimestamp(timestamps[items[0].dataIndex]);
             },
             label(ctx) {
               if (ctx.dataset.label === KG_SCATTER_LABEL) {
@@ -527,14 +502,6 @@ function applyChartAndTable() {
               }
               return "";
             },
-          },
-          // Only show KG dot details on click/tap; allow normal hover tooltips for other datasets.
-          filter(item) {
-            if (item?.dataset?.label !== KG_SCATTER_LABEL) return true;
-            // Click-to-open: allow ONLY the specific dot that was clicked to show details.
-            // This remains true even after mousemove events, until the user clicks elsewhere.
-            if (!kgTooltipArmed || !kgTooltipArmedKey) return false;
-            return item.datasetIndex === kgTooltipArmedKey.datasetIndex && item.dataIndex === kgTooltipArmedKey.dataIndex;
           },
         },
       },
@@ -607,26 +574,6 @@ function showView(view) {
   }
 }
 
-async function fetchMarkets() {
-  try {
-    const [indicesRes, moversRes, sentimentRes] = await Promise.all([
-      fetch("/api/indices"),
-      fetch("/api/movers"),
-      fetch("/api/market-sentiment"),
-    ]);
-    const indices = indicesRes.ok ? (await indicesRes.json()).indices || [] : [];
-    const movers = moversRes.ok ? await moversRes.json() : { gainers: [], losers: [] };
-    const sentiment = sentimentRes.ok ? await sentimentRes.json() : { sentiment: "unknown", score: 0 };
-    renderIndices(indices);
-    renderMovers(movers);
-    renderSentiment(sentiment);
-  } catch (e) {
-    document.getElementById("indicesList").innerText = "Could not load indices";
-    document.getElementById("moversList").innerText = "Could not load movers";
-    document.getElementById("marketSentiment").innerText = "Could not load sentiment";
-    console.error(e);
-  }
-}
 
 function renderIndices(list) {
   const el = document.getElementById("indicesList");
@@ -924,15 +871,13 @@ async function renderResearchCompare(currentTicker) {
     el.appendChild(row);
 
     try {
-      const [quoteRes, candlesRes] = await Promise.all([
-        fetch(`/api/quote?symbol=${encodeURIComponent(symbol)}`),
-        fetch(`/api/candles?symbol=${encodeURIComponent(symbol)}`),
-      ]);
-      const quote = quoteRes.ok ? await quoteRes.json() : null;
-      const candles = candlesRes.ok ? await candlesRes.json() : null;
+      const pricesRes = await fetch(`${API_BASE}/api/prices/${encodeURIComponent(symbol)}?days=60`);
+      const pricesData = pricesRes.ok ? await pricesRes.json() : null;
+      const quote = latestPriceToQuote(pricesData);
+      const candles = pricesToCandles(pricesData);
       const priceCell = row.querySelector(".research-compare-price");
       const trendCell = row.querySelector(".research-compare-trend");
-      if (priceCell) priceCell.textContent = quote && quote.c != null ? formatUsd(quote.c) : "—";
+      if (priceCell) priceCell.textContent = quote.c != null ? formatUsd(quote.c) : "—";
       if (trendCell) trendCell.textContent = trendLabel(candles);
       await createSparkline(`researchSpark_${safeId(symbol)}`, candles);
     } catch (err) {
@@ -956,24 +901,20 @@ async function loadResearch() {
   if (subtitle) subtitle.textContent = `Loading research for ${ticker}…`;
 
   try {
-    const [quoteRes, candleRes, newsRes, profileRes, metricRes, nytRes] = await Promise.all([
-      fetch(`/api/quote?symbol=${encodeURIComponent(ticker)}`),
-      fetch(`/api/candles?symbol=${encodeURIComponent(ticker)}`),
-      fetch(`/api/news?symbol=${encodeURIComponent(ticker)}`),
-      fetch(`/api/profile?symbol=${encodeURIComponent(ticker)}`),
-      fetch(`/api/metric?symbol=${encodeURIComponent(ticker)}`),
-      fetch(`/api/nyt-headlines`),
+    const [pricesRes, articlesRes, correlateRes] = await Promise.all([
+      fetch(`${API_BASE}/api/prices/${encodeURIComponent(ticker)}?days=365`),
+      fetch(`${API_BASE}/api/articles?limit=20`),
+      fetch(`${API_BASE}/api/correlate/${encodeURIComponent(ticker)}`),
     ]);
 
-    let quote = null;
-    try { quote = quoteRes.ok ? await quoteRes.json() : null; } catch (err) { quote = null; }
-    const candles = candleRes.ok ? await candleRes.json() : null;
-    const news = newsRes.ok ? await newsRes.json() : [];
-    const profile = profileRes.ok ? await profileRes.json() : null;
-    const metric = metricRes.ok ? await metricRes.json() : null;
-    const nyt = nytRes.ok ? await nytRes.json() : [];
+    const pricesData = pricesRes.ok ? await pricesRes.json() : null;
+    const quote = latestPriceToQuote(pricesData);
+    const candles = pricesToCandles(pricesData);
+    const news = articlesRes.ok ? await articlesRes.json() : [];
+    const correlate = correlateRes.ok ? await correlateRes.json() : null;
+    const nyt = news;
 
-    researchCache = { ticker, quote, candles, news, profile, metric, nyt };
+    researchCache = { ticker, quote, candles, news, profile: null, metric: null, nyt, correlate };
     renderResearchChart(researchCache);
     renderResearchThesis(researchCache);
     renderResearchNews(news, nyt);
@@ -1007,51 +948,36 @@ async function getStock() {
   document.getElementById("weekChartSubtitle").textContent = "Loading…";
   document.getElementById("weekTableBody").innerHTML = "";
 
-  const base = "";
-  const q = (path) => `${base}${path}?symbol=${encodeURIComponent(ticker)}`;
-
   try {
-    const [quoteRes, candleRes, newsRes, profileRes, metricRes, kgRes] = await Promise.all([
-      fetch(q("/api/quote")),
-      fetch(q("/api/candles")),
-      fetch(q("/api/news")),
-      fetch(q("/api/profile")),
-      fetch(q("/api/metric")),
-      fetch(q("/api/kg/chart-articles")),
+    const [pricesRes, graphRes, articlesRes, correlateRes] = await Promise.all([
+      fetch(`${API_BASE}/api/prices/${encodeURIComponent(ticker)}?days=365`),
+      fetch(`${API_BASE}/api/graph/${encodeURIComponent(ticker)}`),
+      fetch(`${API_BASE}/api/articles?limit=20`),
+      fetch(`${API_BASE}/api/correlate/${encodeURIComponent(ticker)}`),
     ]);
 
-    // tolerate backend parts failing (e.g., missing FINNHUB key) — prefer rendering candles
-    let quote = null;
-    try {
-      quote = await quoteRes.json();
-    } catch (err) {
-      quote = null;
-    }
-    if (!quoteRes.ok) {
-      console.warn("Quote fetch failed", quote && (quote.error || quote.message));
-      // provide a lightweight placeholder so charts/table can still render from candles
-      quote = quote || { c: null, h: null, l: null };
-    }
+    const pricesData = pricesRes.ok ? await pricesRes.json() : null;
+    const quote = latestPriceToQuote(pricesData);
+    const candles = pricesToCandles(pricesData);
+    const profile = null;
+    const metricPayload = null;
 
-    const candles = candleRes.ok ? await candleRes.json() : null;
-    const news = newsRes.ok ? await newsRes.json() : [];
-    const profile = profileRes.ok ? await profileRes.json() : null;
-    const metricPayload = metricRes.ok ? await metricRes.json() : null;
-
-    let kgRaw = null;
-    try {
-      kgRaw = await kgRes.json();
-    } catch {
-      kgRaw = {};
-    }
-    cacheKgArticles = Array.isArray(kgRaw.articles) ? kgRaw.articles : [];
+    let graphData = null;
+    try { graphData = graphRes.ok ? await graphRes.json() : null; } catch { graphData = null; }
+    cacheKgArticles = graphData && Array.isArray(graphData.nodes)
+      ? graphData.nodes.filter(n => n.type === "Article")
+      : [];
     cacheKgLoadError = "";
-    if (!kgRes.ok) {
-      cacheKgLoadError =
-        kgRaw && kgRaw.error != null
-          ? String(kgRaw.error)
-          : `Could not reach KG API (HTTP ${kgRes.status}). Start FastAPI: uvicorn api.main:app --host 127.0.0.1 --port 8000`;
+    // 404 = no articles linked to this ticker in the graph — not an error
+    if (!graphRes.ok && graphRes.status !== 404) {
+      cacheKgLoadError = graphData && graphData.detail != null
+        ? String(graphData.detail)
+        : `Could not reach graph API (HTTP ${graphRes.status}). Start FastAPI: uvicorn api.main:app --host 127.0.0.1 --port 8000`;
     }
+
+    const news = articlesRes.ok ? await articlesRes.json() : [];
+    let correlateData = null;
+    try { correlateData = correlateRes.ok ? await correlateRes.json() : null; } catch { correlateData = null; }
 
     const price = quote.c;
     document.getElementById("price").innerText =
@@ -1085,7 +1011,7 @@ async function getStock() {
         title.textContent = article.headline || article.summary || "—";
         const dateEl = document.createElement("p");
         dateEl.className = "news-date";
-        dateEl.textContent = newsDate(article.datetime);
+        dateEl.textContent = newsDate(article.datetime || article.published_date);
         div.appendChild(title);
         div.appendChild(dateEl);
         newsList.appendChild(div);
@@ -1097,6 +1023,7 @@ async function getStock() {
     cacheCandles = candles;
     applyChartAndTable();
     syncSelectToTicker(ticker);
+    renderCorrelationPanel(correlateData);
   } catch (e) {
     cacheTicker = "";
     cacheQuote = null;
@@ -1108,12 +1035,127 @@ async function getStock() {
     document.getElementById("weekChartSubtitle").textContent =
       "High (green), low (red), trend (blue) — pick 1 week or 1 month after searching";
     document.getElementById("weekTableBody").innerHTML = "";
-    if (chart) {
-      chart.destroy();
-      chart = null;
-    }
+    if (chart) { chart.destroy(); chart = null; }
+    const corrPanel = document.getElementById("corrPanel");
+    if (corrPanel) corrPanel.style.display = "none";
     console.error(e);
   }
+}
+
+function renderCorrelationPanel(data) {
+  const panel = document.getElementById("corrPanel");
+  if (!panel) return;
+
+  if (!data || data.correlation == null || !Array.isArray(data.data_points) || data.data_points.length === 0) {
+    panel.style.display = "none";
+    return;
+  }
+
+  panel.style.display = "block";
+
+  const r = data.correlation;
+
+  const badge = document.getElementById("corrBadge");
+  if (badge) badge.textContent = `r = ${r.toFixed(3)}`;
+
+  const sub = document.getElementById("corrSubtitle");
+  if (sub) sub.textContent = `${data.ticker} · ${data.window_days}-day price window · ${data.total_articles} articles`;
+
+  const pearsonEl = document.getElementById("corrCoefficient");
+  if (pearsonEl) {
+    pearsonEl.textContent = r.toFixed(3);
+    pearsonEl.className = "corr-stat-value " + (r > 0.2 ? "positive" : r < -0.2 ? "negative" : "neutral");
+  }
+
+  const agreeEl = document.getElementById("corrAgreement");
+  if (agreeEl) {
+    agreeEl.textContent = `${data.agreement_rate}%`;
+    agreeEl.className = "corr-stat-value " + (data.agreement_rate >= 55 ? "positive" : data.agreement_rate <= 45 ? "negative" : "neutral");
+  }
+
+  const artEl = document.getElementById("corrArticles");
+  if (artEl) { artEl.textContent = data.total_articles; artEl.className = "corr-stat-value"; }
+
+  const sumEl = document.getElementById("corrSummary");
+  if (sumEl) sumEl.textContent = data.summary;
+
+  // Build two datasets: points where sentiment & price moved together vs apart
+  const aligned = [];
+  const diverged = [];
+  for (const pt of data.data_points) {
+    const point = { x: pt.sentiment, y: pt.price_change, headline: pt.headline, date: pt.published_date };
+    const agrees = (pt.sentiment > 0.05 && pt.price_change > 0) || (pt.sentiment < -0.05 && pt.price_change < 0);
+    (agrees ? aligned : diverged).push(point);
+  }
+
+  const ctx = document.getElementById("corrChart").getContext("2d");
+  if (corrChart) corrChart.destroy();
+
+  corrChart = new Chart(ctx, {
+    type: "scatter",
+    data: {
+      datasets: [
+        {
+          label: "Aligned (sentiment matched price)",
+          data: aligned,
+          backgroundColor: "rgba(126,243,160,0.75)",
+          borderColor: "#7ef3a0",
+          borderWidth: 1,
+          pointRadius: 7,
+          pointHoverRadius: 10,
+        },
+        {
+          label: "Diverged (sentiment vs price)",
+          data: diverged,
+          backgroundColor: "rgba(255,154,154,0.75)",
+          borderColor: "#ff9a9a",
+          borderWidth: 1,
+          pointRadius: 7,
+          pointHoverRadius: 10,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: true,
+          position: "bottom",
+          labels: { color: "#94a3b8", boxWidth: 12, padding: 16, font: { size: 11 } },
+        },
+        tooltip: {
+          callbacks: {
+            label(ctx) {
+              const pt = ctx.raw;
+              return [
+                `Sentiment: ${Number(pt.x).toFixed(3)}`,
+                `Price Δ: ${Number(pt.y).toFixed(2)}%`,
+                pt.date ? `Date: ${pt.date}` : "",
+              ].filter(Boolean);
+            },
+            afterLabel(ctx) {
+              return (ctx.raw.headline || "").slice(0, 90);
+            },
+          },
+        },
+      },
+      scales: {
+        x: {
+          title: { display: true, text: "Article Sentiment Score  (−1 negative → +1 positive)", color: "#64748b", font: { size: 11 } },
+          grid: { color: "rgba(255,255,255,0.05)" },
+          ticks: { color: "#64748b" },
+          min: -1,
+          max: 1,
+        },
+        y: {
+          title: { display: true, text: `Price Change % (${data.window_days}-day window after article)`, color: "#64748b", font: { size: 11 } },
+          grid: { color: "rgba(255,255,255,0.05)" },
+          ticks: { color: "#64748b", callback: v => `${v}%` },
+        },
+      },
+    },
+  });
 }
 
 
@@ -1174,8 +1216,8 @@ async function renderIndicesExpanded(indices){
     // fetch candles for mini chart
     (async ()=>{
       try{
-        const r = await fetch(`/api/candles?symbol=${encodeURIComponent(sym)}`);
-        const cj = r.ok? await r.json(): null;
+        const r = await fetch(`${API_BASE}/api/prices/${encodeURIComponent(sym)}?days=30`);
+        const cj = r.ok ? pricesToCandles(await r.json()) : null;
         await createMiniChart(`mini_${idSafe}`, cj);
       }catch(e){ console.warn('mini chart fetch failed', sym, e); }
     })();
@@ -1197,8 +1239,8 @@ async function renderMoversExpanded(payload){
       el.appendChild(row);
       (async ()=>{
         try{
-          const r = await fetch(`/api/candles?symbol=${encodeURIComponent(it.symbol)}`);
-          const cj = r.ok? await r.json(): null;
+          const r = await fetch(`${API_BASE}/api/prices/${encodeURIComponent(it.symbol)}?days=30`);
+          const cj = r.ok ? pricesToCandles(await r.json()) : null;
           await createSparkline(`spark_${idSafe}`, cj);
         }catch(e){ console.warn('spark fetch failed', it.symbol, e); }
       })();
@@ -1313,26 +1355,73 @@ function renderSectorHeatmap() {
   }
 }
 
-// enhance fetchMarkets to use expanded renderers
-async function fetchMarkets(){
-  try{
-    const [indicesRes, moversRes, sentimentRes] = await Promise.all([
-      fetch('/api/indices'), fetch('/api/movers'), fetch('/api/market-sentiment')
-    ]);
-    const indices = indicesRes.ok? (await indicesRes.json()).indices || [] : [];
-    const movers = moversRes.ok? await moversRes.json() : {gainers:[], losers:[]};
-    const sentiment = sentimentRes.ok? await sentimentRes.json() : {sentiment:'unknown', score:0};
-    
-    // Render all visual elements
+async function fetchMarkets() {
+  try {
+    const tickerList = await fetch(`${API_BASE}/api/tickers`).then(r => r.ok ? r.json() : []);
+
+    // Fetch recent prices per ticker — 10 days covers weekends and holidays
+    const priceResults = await Promise.all(
+      tickerList.map(sym =>
+        fetch(`${API_BASE}/api/prices/${encodeURIComponent(sym)}?days=10`)
+          .then(r => r.ok ? r.json() : null)
+          .catch(() => null)
+      )
+    );
+
+    const allItems = [];
+    tickerList.forEach((sym, i) => {
+      const data = priceResults[i];
+      if (!data || !Array.isArray(data.prices) || data.prices.length === 0) return;
+      const latest = data.prices[data.prices.length - 1];
+      allItems.push({
+        symbol: sym,
+        price: latest.close,
+        changePercent: latest.pct_change ?? null,
+        change: latest.pct_change != null && latest.close != null
+          ? parseFloat((latest.close * latest.pct_change / 100).toFixed(2))
+          : null,
+      });
+    });
+
+    // Separate index tickers (start with ^) from regular stocks
+    const indices = allItems.filter(it => it.symbol.startsWith("^"));
+    const stocks = allItems.filter(it => !it.symbol.startsWith("^"));
+    const displayIndices = indices.length > 0 ? indices : allItems.slice(0, 4);
+
+    const sortedStocks = [...(stocks.length > 0 ? stocks : allItems)]
+      .sort((a, b) => (b.changePercent ?? -Infinity) - (a.changePercent ?? -Infinity));
+    const movers = {
+      gainers: sortedStocks.slice(0, 5),
+      losers: [...sortedStocks].reverse().slice(0, 5),
+    };
+
+    // Market sentiment from /api/correlate on the first available ticker
+    let sentiment = { sentiment: "unknown", score: 0 };
+    if (tickerList.length > 0) {
+      const corrTicker = stocks[0]?.symbol || tickerList[0];
+      const corrRes = await fetch(`${API_BASE}/api/correlate/${encodeURIComponent(corrTicker)}`);
+      if (corrRes.ok) {
+        const corr = await corrRes.json();
+        const r = corr.correlation ?? 0;
+        sentiment = {
+          sentiment: r > 0.2 ? "positive" : r < -0.2 ? "negative" : "neutral",
+          score: r,
+        };
+      }
+    }
+
     updateMarketStatus();
     updateVIX();
     updateMarketBreadth();
     renderSectorHeatmap();
-    
-    await renderIndicesExpanded(indices);
+    await renderIndicesExpanded(displayIndices);
     await renderMoversExpanded(movers);
     renderSentiment(sentiment);
-  }catch(e){ console.error('fetchMarkets expanded failed', e); document.getElementById('indicesGrid').innerText='Could not load indices'; document.getElementById('moversTable').innerText='Could not load movers'; }
+  } catch (e) {
+    console.error("fetchMarkets failed", e);
+    document.getElementById("indicesGrid").innerText = "Could not load indices";
+    document.getElementById("moversTable").innerText = "Could not load movers";
+  }
 }
 
 // Expose handlers used by inline HTML attributes (onclick/onchange).

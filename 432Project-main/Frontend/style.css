@@ -595,7 +595,6 @@ p{
     margin-right: 4px;
     font-weight: 500;
 }
-
 /* Markets layout */
 .markets-grid-bottom{
     display:grid;
@@ -1173,4 +1172,108 @@ p{
     .research-compare-row canvas {
         display: none;
     }
+}
+
+/* ── Correlation Panel ───────────────────────────────────────────── */
+.corr-panel {
+    margin: 24px 0 0;
+    background: #111c2b;
+    border: 1px solid rgba(0,255,204,0.14);
+    border-radius: 12px;
+    padding: 20px 24px 24px;
+}
+
+.corr-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+
+.corr-header h3 {
+    color: #00ffcc;
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0 0 2px;
+}
+
+.corr-subtitle {
+    font-size: 0.75rem;
+    color: #64748b;
+    margin: 0;
+}
+
+.corr-badge {
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 20px;
+    background: rgba(0,255,204,0.08);
+    color: #00ffcc;
+    border: 1px solid rgba(0,255,204,0.2);
+    white-space: nowrap;
+}
+
+.corr-body {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+}
+
+.corr-chart-wrap {
+    flex: 1;
+    min-width: 0;
+    height: 280px;
+    position: relative;
+}
+
+.corr-stats {
+    width: 192px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.corr-stat {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 8px;
+    padding: 10px 14px;
+}
+
+.corr-stat-label {
+    display: block;
+    font-size: 0.68rem;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 3px;
+}
+
+.corr-stat-value {
+    display: block;
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: #e2e8f0;
+}
+
+.corr-stat-value.positive { color: #7ef3a0; }
+.corr-stat-value.negative { color: #ff9a9a; }
+.corr-stat-value.neutral  { color: #94a3b8; }
+
+.corr-summary-box {
+    background: rgba(0,255,204,0.04);
+    border-left: 3px solid rgba(0,255,204,0.4);
+    border-radius: 0 6px 6px 0;
+    padding: 10px 12px;
+    font-size: 0.78rem;
+    color: #94a3b8;
+    line-height: 1.55;
+}
+
+@media (max-width: 640px) {
+    .corr-body { flex-direction: column; }
+    .corr-stats { width: 100%; }
+    .corr-chart-wrap { height: 220px; }
 }
