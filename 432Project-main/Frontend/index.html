@@ -24,7 +24,6 @@
         <a href="#" class="nav-link active" id="navHome" onclick="showView('home')">Home</a>
         <a href="#" class="nav-link" id="navMarkets" onclick="showView('markets')">Markets</a>
         <a href="#" class="nav-link" id="navResearch" onclick="showView('research')">Research</a>
-        <a href="#" class="nav-link" id="navPortfolio" onclick="showView('portfolio')">Portfolio</a>
     </div>
 </nav>
 
@@ -49,16 +48,23 @@
         <div class="search-box">
             <select id="tickerSelect" class="ticker-select" aria-label="Pick a stock" onchange="onTickerSelect()">
                 <option value="">Pick a stock…</option>
-                <option value="AAPL">Apple (AAPL)</option>
-                <option value="MSFT">Microsoft (MSFT)</option>
-                <option value="GOOGL">Alphabet (GOOGL)</option>
-                <option value="AMZN">Amazon (AMZN)</option>
-                <option value="META">Meta (META)</option>
-                <option value="NVDA">NVIDIA (NVDA)</option>
-                <option value="TSLA">Tesla (TSLA)</option>
-                <option value="JPM">JPMorgan (JPM)</option>
-                <option value="JNJ">Johnson &amp; Johnson (JNJ)</option>
-                <option value="XOM">Exxon Mobil (XOM)</option>
+                <optgroup label="Market Indices">
+                    <option value="^DJI">Dow Jones (^DJI)</option>
+                    <option value="^GSPC">S&amp;P 500 (^GSPC)</option>
+                    <option value="^IXIC">Nasdaq (^IXIC)</option>
+                </optgroup>
+                <optgroup label="Stocks">
+                    <option value="AAPL">Apple (AAPL)</option>
+                    <option value="MSFT">Microsoft (MSFT)</option>
+                    <option value="GOOGL">Alphabet (GOOGL)</option>
+                    <option value="AMZN">Amazon (AMZN)</option>
+                    <option value="META">Meta (META)</option>
+                    <option value="NVDA">NVIDIA (NVDA)</option>
+                    <option value="TSLA">Tesla (TSLA)</option>
+                    <option value="JPM">JPMorgan (JPM)</option>
+                    <option value="JNJ">Johnson &amp; Johnson (JNJ)</option>
+                    <option value="XOM">Exxon Mobil (XOM)</option>
+                </optgroup>
             </select>
             <div class="search-input-wrap">
                 <input id="ticker" placeholder="Or type a symbol" autocomplete="off">
