@@ -404,6 +404,7 @@ function applyChartAndTable() {
           tension: 0.25,
           fill: false,
           pointRadius: denseMonth ? 3 : 5,
+          pointHoverRadius: denseMonth ? 3 : 5,
           pointBackgroundColor: "#16a34a",
           pointBorderColor: "#fff",
           pointBorderWidth: 2,
@@ -417,6 +418,7 @@ function applyChartAndTable() {
           tension: 0.25,
           fill: false,
           pointRadius: denseMonth ? 3 : 5,
+          pointHoverRadius: denseMonth ? 3 : 5,
           pointBackgroundColor: "#dc2626",
           pointBorderColor: "#fff",
           pointBorderWidth: 2,
@@ -449,7 +451,7 @@ function applyChartAndTable() {
       borderColor: "#fff",
       borderWidth: 2,
       pointRadius: denseMonth ? 5 : 7,
-      pointHoverRadius: 10,
+      pointHoverRadius: denseMonth ? 5 : 7,
       pointHitRadius: 16,
       order: 10,
       pointBackgroundColor(ctx) {
@@ -475,7 +477,8 @@ function applyChartAndTable() {
     },
     options: {
       responsive: true,
-      interaction: { mode: "index", intersect: false },
+      events: ["click", "touchend"],
+      interaction: { mode: "nearest", intersect: true },
       elements: {
         point: {
           hoverRadius: 0,
@@ -497,12 +500,33 @@ function applyChartAndTable() {
           },
         },
         tooltip: {
-          mode: "index",
-          intersect: false,
+          events: ["click", "touchend"],
+          mode: "nearest",
+          intersect: true,
+          filter(item) {
+            return item.dataset.label !== "Trend (avg of high & low)";
+          },
           callbacks: {
             title(items) {
               if (!items || items.length === 0) return "";
-              return chartTimestamp(timestamps[items[0].dataIndex]);
+              const first = items[0];
+              if (first.dataset.label === KG_SCATTER_LABEL) {
+                const raw = first.raw;
+                if (raw && typeof raw.x === "string") {
+                  const idx = labels.indexOf(raw.x);
+                  if (idx >= 0 && timestamps[idx] != null) {
+                    return chartTimestamp(timestamps[idx]);
+                  }
+                }
+                const meta = cacheScatterMeta[first.dataIndex];
+                const pub = meta && String(meta.published_date || "").slice(0, 10);
+                if (pub) {
+                  const sec = Math.floor(new Date(`${pub}T21:00:00Z`).getTime() / 1000);
+                  if (!Number.isNaN(sec)) return chartTimestamp(sec);
+                }
+                return "Article";
+              }
+              return chartTimestamp(timestamps[first.dataIndex]);
             },
             label(ctx) {
               if (ctx.dataset.label === KG_SCATTER_LABEL) {
