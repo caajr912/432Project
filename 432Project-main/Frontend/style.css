@@ -350,7 +350,7 @@ button:disabled{
     flex-shrink: 0;
     font-weight: 600;
     font-size: 11px;
-    color: #00ffcc;
+    color: #ffffff;
     padding: 10px 40px 8px 12px;
     margin: 0;
     border-bottom: 1px solid rgba(0, 255, 204, 0.18);
@@ -376,6 +376,7 @@ button:disabled{
 
 .stock-chart-tooltip-row{
     margin: 2px 0;
+    color: #ffffff;
 }
 
 .stock-chart-html-tooltip a.stock-chart-tooltip-link{
