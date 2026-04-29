@@ -268,12 +268,129 @@ button:disabled{
 }
 
 .chart-wrap{
+    position: relative;
     width:100%;
     background: rgba(15, 26, 46, 0.6);
     border: 1px solid rgba(0, 255, 204, 0.2);
     border-radius: 8px;
     padding: 16px;
     margin-bottom: 20px;
+}
+
+.stock-chart-html-tooltip{
+    box-sizing: border-box;
+    width: min(336px, calc(100vw - 40px));
+    height: 180px;
+    padding: 0;
+    border-radius: 8px;
+    background: rgba(15, 26, 46, 0.96);
+    border: 1px solid rgba(0, 255, 204, 0.35);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    font-family: Inter, sans-serif;
+    font-size: 12px;
+    line-height: 1.35;
+    color: #e2e8f0;
+    transition: opacity 0.12s ease;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* High / low dots only — shrink to content; graph article keeps fixed box */
+.stock-chart-html-tooltip.stock-chart-html-tooltip--compact{
+    width: fit-content;
+    min-width: 11rem;
+    max-width: min(360px, calc(100vw - 40px));
+    height: auto;
+    overflow: visible;
+}
+
+.stock-chart-html-tooltip--compact .stock-chart-tooltip-body{
+    flex: 0 0 auto;
+    min-height: 0;
+    overflow: visible;
+}
+
+.stock-chart-html-tooltip--compact .stock-chart-tooltip-title{
+    white-space: normal;
+}
+
+.stock-chart-tooltip-close{
+    position: absolute;
+    top: 7px;
+    right: 7px;
+    z-index: 2;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    border: 1px solid rgba(0, 255, 204, 0.45);
+    background: rgba(15, 26, 46, 0.95);
+    color: #cbd5e1;
+    cursor: pointer;
+    box-sizing: border-box;
+}
+
+.stock-chart-tooltip-close:hover{
+    color: #fecaca;
+    border-color: rgba(248, 113, 113, 0.65);
+    background: rgba(127, 29, 29, 0.35);
+}
+
+.stock-chart-tooltip-close:focus-visible{
+    outline: 2px solid #00ffcc;
+    outline-offset: 2px;
+}
+
+.stock-chart-tooltip-title{
+    flex-shrink: 0;
+    font-weight: 600;
+    font-size: 11px;
+    color: #ffffff;
+    padding: 10px 40px 8px 12px;
+    margin: 0;
+    border-bottom: 1px solid rgba(0, 255, 204, 0.18);
+}
+
+.stock-chart-tooltip-body{
+    flex: 1;
+    min-height: 0;
+    padding: 8px 12px 10px;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+.stock-chart-tooltip-headline{
+    margin: 2px 0 6px;
+}
+
+.stock-chart-tooltip-meta{
+    font-size: 11px;
+    color: #94a3b8;
+    margin-bottom: 4px;
+}
+
+.stock-chart-tooltip-row{
+    margin: 2px 0;
+    color: #ffffff;
+}
+
+.stock-chart-html-tooltip a.stock-chart-tooltip-link{
+    display: block;
+    margin-top: 8px;
+    word-break: break-word;
+    color: #7dd3fc;
+    font-weight: 500;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.stock-chart-html-tooltip a.stock-chart-tooltip-link:hover{
+    color: #bae6fd;
 }
 
 canvas{

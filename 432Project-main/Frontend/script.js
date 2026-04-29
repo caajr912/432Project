@@ -12,8 +12,17 @@ let cacheKgArticles = [];
 let cacheKgLoadError = "";
 /** One entry per scatter point — aligned with scatter dataset `data` */
 let cacheScatterMeta = [];
+/** `Set` of Neo4j article ids that appear in `/api/correlate` data_points; `null` if correlate was not loaded */
+let cacheCorrelateArticleIds = null;
 
 const KG_SCATTER_LABEL = "Graph-linked news (Neo4j)";
+
+/** Graph article node ids are `article_{neo4jId}`; correlate uses raw `article_id`. */
+function neo4jArticleIdFromScatterMeta(meta) {
+  if (!meta || meta.id == null) return null;
+  const id = String(meta.id);
+  return id.startsWith("article_") ? id.slice("article_".length) : id;
+}
 
 const API_BASE = "http://3.133.101.108:8000";
 
@@ -317,6 +326,169 @@ function setChartRange(mode) {
   if (cacheTicker && cacheQuote) applyChartAndTable();
 }
 
+function removeStockChartHtmlTooltip() {
+  document.getElementById("stockChart")?.parentNode?.querySelector(".stock-chart-html-tooltip")?.remove();
+}
+
+function closeStockChartHtmlTooltip() {
+  const canvas = document.getElementById("stockChart");
+  const ch = typeof Chart !== "undefined" && Chart.getChart && canvas ? Chart.getChart(canvas) : null;
+  if (ch && typeof ch.setActiveElements === "function") {
+    ch.setActiveElements([]);
+    ch.update("none");
+  }
+  const tip = canvas?.parentNode?.querySelector(".stock-chart-html-tooltip");
+  if (tip) {
+    tip.style.opacity = "0";
+    tip.style.visibility = "hidden";
+    tip.style.pointerEvents = "none";
+  }
+}
+
+/** Only allow http(s) URLs for article links (XSS-safe href). */
+function safeArticleHref(raw) {
+  const s = String(raw || "").trim();
+  if (!s) return null;
+  try {
+    const u = new URL(s);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+    return u.href;
+  } catch {
+    return null;
+  }
+}
+
+function truncateUrlForDisplay(u, maxLen) {
+  if (u.length <= maxLen) return u;
+  const keep = Math.max(8, Math.floor((maxLen - 1) / 2));
+  return u.slice(0, keep) + "…" + u.slice(-keep);
+}
+
+function positionStockChartHtmlTooltip(el, chart, tooltip) {
+  const { offsetLeft, offsetTop } = chart.canvas;
+  const cx = tooltip.caretX != null ? tooltip.caretX : tooltip.x;
+  const cy = tooltip.caretY != null ? tooltip.caretY : tooltip.y;
+  el.style.position = "absolute";
+  el.style.left = `${offsetLeft + cx}px`;
+  el.style.top = `${offsetTop + cy}px`;
+  el.style.transform = "translate(-50%, calc(-100% - 10px))";
+  el.style.zIndex = "30";
+}
+
+/** HTML tooltip for home stock chart so article URLs are real links. */
+function stockChartExternalTooltip(context) {
+  const { chart, tooltip } = context;
+  const wrap = chart.canvas && chart.canvas.parentNode;
+  if (!wrap) return;
+
+  let el = wrap.querySelector(".stock-chart-html-tooltip");
+  if (!el) {
+    el = document.createElement("div");
+    el.className = "stock-chart-html-tooltip";
+    el.setAttribute("role", "tooltip");
+    const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
+    closeBtn.className = "stock-chart-tooltip-close";
+    closeBtn.setAttribute("aria-label", "Close tooltip");
+    closeBtn.innerHTML =
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 18 18" width="12" height="12" aria-hidden="true">' +
+      '<circle cx="9" cy="9" r="7.25" fill="none" stroke="currentColor" stroke-width="1.25"/>' +
+      '<path d="M6 6l6 6M12 6l-6 6" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round"/>' +
+      "</svg>";
+    closeBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      closeStockChartHtmlTooltip();
+    });
+    el.appendChild(closeBtn);
+    wrap.appendChild(el);
+  }
+
+  if (tooltip.opacity === 0) {
+    el.style.opacity = "0";
+    el.style.visibility = "hidden";
+    el.style.pointerEvents = "none";
+    return;
+  }
+
+  let active = typeof chart.getActiveElements === "function" ? chart.getActiveElements() : [];
+  if (!active.length && Array.isArray(tooltip.dataPoints) && tooltip.dataPoints.length) {
+    active = tooltip.dataPoints.map((dp) => ({
+      datasetIndex: dp.datasetIndex,
+      index: dp.dataIndex != null ? dp.dataIndex : dp.index,
+    }));
+  }
+
+  if (!active.length) {
+    el.style.opacity = "0";
+    el.style.visibility = "hidden";
+    el.style.pointerEvents = "none";
+    return;
+  }
+
+  const hasGraphArticle = active.some((a) => {
+    const ds = chart.data.datasets[a.datasetIndex];
+    return ds && ds.label === KG_SCATTER_LABEL;
+  });
+  el.classList.toggle("stock-chart-html-tooltip--compact", !hasGraphArticle);
+
+  el.querySelector(".stock-chart-tooltip-title")?.remove();
+  el.querySelector(".stock-chart-tooltip-body")?.remove();
+
+  const titleLines = tooltip.title || [];
+  const titleDiv = document.createElement("div");
+  titleDiv.className = "stock-chart-tooltip-title";
+  titleDiv.textContent = titleLines.join("\n");
+  el.appendChild(titleDiv);
+
+  const body = document.createElement("div");
+  body.className = "stock-chart-tooltip-body";
+  el.appendChild(body);
+
+  for (const a of active) {
+    const ds = chart.data.datasets[a.datasetIndex];
+    if (!ds || ds.label === "Trend (avg of high & low)") continue;
+    const idx = a.index;
+
+    if (ds.label === KG_SCATTER_LABEL) {
+      const meta = cacheScatterMeta[idx];
+      if (!meta) continue;
+      const headline = document.createElement("div");
+      headline.className = "stock-chart-tooltip-headline";
+      headline.textContent = (meta.headline || "—").slice(0, 140);
+      body.appendChild(headline);
+      if (meta.sentiment != null && !Number.isNaN(Number(meta.sentiment))) {
+        const sent = document.createElement("div");
+        sent.className = "stock-chart-tooltip-meta";
+        sent.textContent = `Sentiment ${Number(meta.sentiment).toFixed(2)}`;
+        body.appendChild(sent);
+      }
+      const href = safeArticleHref(meta.url);
+      if (href) {
+        const link = document.createElement("a");
+        link.className = "stock-chart-tooltip-link";
+        link.href = href;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.textContent = truncateUrlForDisplay(href, 76);
+        body.appendChild(link);
+      }
+    } else {
+      const rawVal = ds.data[idx];
+      const y = typeof rawVal === "object" && rawVal !== null && "y" in rawVal ? rawVal.y : rawVal;
+      const row = document.createElement("div");
+      row.className = "stock-chart-tooltip-row";
+      row.textContent = `${ds.label}: ${formatUsd(y)}`;
+      body.appendChild(row);
+    }
+  }
+
+  el.style.opacity = "1";
+  el.style.visibility = "visible";
+  el.style.pointerEvents = "auto";
+  positionStockChartHtmlTooltip(el, chart, tooltip);
+}
+
 function applyChartAndTable() {
   const ticker = cacheTicker;
   const quote = cacheQuote;
@@ -371,13 +543,14 @@ function applyChartAndTable() {
 
   let sub = chartRangeSubtitle(slice, chartRangeMode);
   if (kgScatter.length > 0) {
-    sub += ` — purple dots = Neo4j-linked articles (${kgScatter.length} in range)`;
+    sub += ` — Neo4j-linked articles (${kgScatter.length} in range): purple = in correlation window, white = no overlap yet`;
   } else if (cacheKgLoadError) {
     sub += ` — ${cacheKgLoadError.slice(0, 140)}`;
   }
   document.getElementById("weekChartSubtitle").textContent = sub;
 
   const ctx = document.getElementById("stockChart").getContext("2d");
+  removeStockChartHtmlTooltip();
   if (chart) chart.destroy();
 
   const denseMonth = chartRangeMode === "month" && labels.length > 14;
@@ -395,6 +568,7 @@ function applyChartAndTable() {
           tension: 0.25,
           fill: false,
           pointRadius: denseMonth ? 3 : 5,
+          pointHoverRadius: denseMonth ? 3 : 5,
           pointBackgroundColor: "#16a34a",
           pointBorderColor: "#fff",
           pointBorderWidth: 2,
@@ -408,6 +582,7 @@ function applyChartAndTable() {
           tension: 0.25,
           fill: false,
           pointRadius: denseMonth ? 3 : 5,
+          pointHoverRadius: denseMonth ? 3 : 5,
           pointBackgroundColor: "#dc2626",
           pointBorderColor: "#fff",
           pointBorderWidth: 2,
@@ -430,17 +605,31 @@ function applyChartAndTable() {
   ];
 
   if (kgScatter.length > 0) {
+    const purpleFill = "rgba(124, 58, 237, 0.92)";
+    const whiteFill = "rgba(255, 255, 255, 0.96)";
     datasets.push({
       type: "scatter",
       label: KG_SCATTER_LABEL,
       data: kgScatter,
-      backgroundColor: "rgba(124, 58, 237, 0.92)",
+      backgroundColor: purpleFill,
       borderColor: "#fff",
       borderWidth: 2,
       pointRadius: denseMonth ? 5 : 7,
-      pointHoverRadius: 10,
+      pointHoverRadius: denseMonth ? 5 : 7,
       pointHitRadius: 16,
       order: 10,
+      pointBackgroundColor(ctx) {
+        if (cacheCorrelateArticleIds == null) return purpleFill;
+        const aid = neo4jArticleIdFromScatterMeta(cacheScatterMeta[ctx.dataIndex]);
+        if (aid != null && cacheCorrelateArticleIds.has(aid)) return purpleFill;
+        return whiteFill;
+      },
+      pointBorderColor(ctx) {
+        if (cacheCorrelateArticleIds == null) return "#fff";
+        const aid = neo4jArticleIdFromScatterMeta(cacheScatterMeta[ctx.dataIndex]);
+        if (aid != null && cacheCorrelateArticleIds.has(aid)) return "#fff";
+        return "#64748b";
+      },
     });
   }
 
@@ -452,7 +641,8 @@ function applyChartAndTable() {
     },
     options: {
       responsive: true,
-      interaction: { mode: "index", intersect: false },
+      events: ["click", "touchend"],
+      interaction: { mode: "nearest", intersect: true },
       elements: {
         point: {
           hoverRadius: 0,
@@ -474,12 +664,35 @@ function applyChartAndTable() {
           },
         },
         tooltip: {
-          mode: "index",
-          intersect: false,
+          enabled: false,
+          external: stockChartExternalTooltip,
+          events: ["click", "touchend"],
+          mode: "nearest",
+          intersect: true,
+          filter(item) {
+            return item.dataset.label !== "Trend (avg of high & low)";
+          },
           callbacks: {
             title(items) {
               if (!items || items.length === 0) return "";
-              return chartTimestamp(timestamps[items[0].dataIndex]);
+              const first = items[0];
+              if (first.dataset.label === KG_SCATTER_LABEL) {
+                const raw = first.raw;
+                if (raw && typeof raw.x === "string") {
+                  const idx = labels.indexOf(raw.x);
+                  if (idx >= 0 && timestamps[idx] != null) {
+                    return chartTimestamp(timestamps[idx]);
+                  }
+                }
+                const meta = cacheScatterMeta[first.dataIndex];
+                const pub = meta && String(meta.published_date || "").slice(0, 10);
+                if (pub) {
+                  const sec = Math.floor(new Date(`${pub}T21:00:00Z`).getTime() / 1000);
+                  if (!Number.isNaN(sec)) return chartTimestamp(sec);
+                }
+                return "Article";
+              }
+              return chartTimestamp(timestamps[first.dataIndex]);
             },
             label(ctx) {
               if (ctx.dataset.label === KG_SCATTER_LABEL) {
@@ -494,13 +707,6 @@ function applyChartAndTable() {
               }
               const v = ctx.parsed.y;
               return `${ctx.dataset.label}: ${formatUsd(v)}`;
-            },
-            afterLabel(ctx) {
-              if (ctx.dataset.label === KG_SCATTER_LABEL) {
-                const meta = cacheScatterMeta[ctx.dataIndex];
-                return meta && meta.url ? String(meta.url) : "";
-              }
-              return "";
             },
           },
         },
@@ -979,6 +1185,14 @@ async function getStock() {
     let correlateData = null;
     try { correlateData = correlateRes.ok ? await correlateRes.json() : null; } catch { correlateData = null; }
 
+    if (correlateData && Array.isArray(correlateData.data_points)) {
+      cacheCorrelateArticleIds = new Set(
+        correlateData.data_points.map((d) => (d && d.article_id != null ? String(d.article_id) : "")).filter(Boolean)
+      );
+    } else {
+      cacheCorrelateArticleIds = null;
+    }
+
     const price = quote.c;
     document.getElementById("price").innerText =
       price != null ? formatUsd(price) : "—";
@@ -1031,10 +1245,12 @@ async function getStock() {
     cacheKgArticles = [];
     cacheKgLoadError = "";
     cacheScatterMeta = [];
+    cacheCorrelateArticleIds = null;
     document.getElementById("price").innerText = e.message || "Request failed";
     document.getElementById("weekChartSubtitle").textContent =
       "High (green), low (red), trend (blue) — pick 1 week or 1 month after searching";
     document.getElementById("weekTableBody").innerHTML = "";
+    removeStockChartHtmlTooltip();
     if (chart) { chart.destroy(); chart = null; }
     const corrPanel = document.getElementById("corrPanel");
     if (corrPanel) corrPanel.style.display = "none";
