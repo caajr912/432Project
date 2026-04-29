@@ -12,8 +12,17 @@ let cacheKgArticles = [];
 let cacheKgLoadError = "";
 /** One entry per scatter point — aligned with scatter dataset `data` */
 let cacheScatterMeta = [];
+/** `Set` of Neo4j article ids that appear in `/api/correlate` data_points; `null` if correlate was not loaded */
+let cacheCorrelateArticleIds = null;
 
 const KG_SCATTER_LABEL = "Graph-linked news (Neo4j)";
+
+/** Graph article node ids are `article_{neo4jId}`; correlate uses raw `article_id`. */
+function neo4jArticleIdFromScatterMeta(meta) {
+  if (!meta || meta.id == null) return null;
+  const id = String(meta.id);
+  return id.startsWith("article_") ? id.slice("article_".length) : id;
+}
 
 const API_BASE = "http://3.133.101.108:8000";
 
@@ -371,7 +380,7 @@ function applyChartAndTable() {
 
   let sub = chartRangeSubtitle(slice, chartRangeMode);
   if (kgScatter.length > 0) {
-    sub += ` — purple dots = Neo4j-linked articles (${kgScatter.length} in range)`;
+    sub += ` — Neo4j-linked articles (${kgScatter.length} in range): purple = in correlation window, white = no overlap yet`;
   } else if (cacheKgLoadError) {
     sub += ` — ${cacheKgLoadError.slice(0, 140)}`;
   }
@@ -430,17 +439,31 @@ function applyChartAndTable() {
   ];
 
   if (kgScatter.length > 0) {
+    const purpleFill = "rgba(124, 58, 237, 0.92)";
+    const whiteFill = "rgba(255, 255, 255, 0.96)";
     datasets.push({
       type: "scatter",
       label: KG_SCATTER_LABEL,
       data: kgScatter,
-      backgroundColor: "rgba(124, 58, 237, 0.92)",
+      backgroundColor: purpleFill,
       borderColor: "#fff",
       borderWidth: 2,
       pointRadius: denseMonth ? 5 : 7,
       pointHoverRadius: 10,
       pointHitRadius: 16,
       order: 10,
+      pointBackgroundColor(ctx) {
+        if (cacheCorrelateArticleIds == null) return purpleFill;
+        const aid = neo4jArticleIdFromScatterMeta(cacheScatterMeta[ctx.dataIndex]);
+        if (aid != null && cacheCorrelateArticleIds.has(aid)) return purpleFill;
+        return whiteFill;
+      },
+      pointBorderColor(ctx) {
+        if (cacheCorrelateArticleIds == null) return "#fff";
+        const aid = neo4jArticleIdFromScatterMeta(cacheScatterMeta[ctx.dataIndex]);
+        if (aid != null && cacheCorrelateArticleIds.has(aid)) return "#fff";
+        return "#64748b";
+      },
     });
   }
 
@@ -979,6 +1002,14 @@ async function getStock() {
     let correlateData = null;
     try { correlateData = correlateRes.ok ? await correlateRes.json() : null; } catch { correlateData = null; }
 
+    if (correlateData && Array.isArray(correlateData.data_points)) {
+      cacheCorrelateArticleIds = new Set(
+        correlateData.data_points.map((d) => (d && d.article_id != null ? String(d.article_id) : "")).filter(Boolean)
+      );
+    } else {
+      cacheCorrelateArticleIds = null;
+    }
+
     const price = quote.c;
     document.getElementById("price").innerText =
       price != null ? formatUsd(price) : "—";
@@ -1031,6 +1062,7 @@ async function getStock() {
     cacheKgArticles = [];
     cacheKgLoadError = "";
     cacheScatterMeta = [];
+    cacheCorrelateArticleIds = null;
     document.getElementById("price").innerText = e.message || "Request failed";
     document.getElementById("weekChartSubtitle").textContent =
       "High (green), low (red), trend (blue) — pick 1 week or 1 month after searching";
