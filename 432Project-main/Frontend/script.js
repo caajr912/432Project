@@ -330,6 +330,21 @@ function removeStockChartHtmlTooltip() {
   document.getElementById("stockChart")?.parentNode?.querySelector(".stock-chart-html-tooltip")?.remove();
 }
 
+function closeStockChartHtmlTooltip() {
+  const canvas = document.getElementById("stockChart");
+  const ch = typeof Chart !== "undefined" && Chart.getChart && canvas ? Chart.getChart(canvas) : null;
+  if (ch && typeof ch.setActiveElements === "function") {
+    ch.setActiveElements([]);
+    ch.update("none");
+  }
+  const tip = canvas?.parentNode?.querySelector(".stock-chart-html-tooltip");
+  if (tip) {
+    tip.style.opacity = "0";
+    tip.style.visibility = "hidden";
+    tip.style.pointerEvents = "none";
+  }
+}
+
 /** Only allow http(s) URLs for article links (XSS-safe href). */
 function safeArticleHref(raw) {
   const s = String(raw || "").trim();
@@ -371,6 +386,21 @@ function stockChartExternalTooltip(context) {
     el = document.createElement("div");
     el.className = "stock-chart-html-tooltip";
     el.setAttribute("role", "tooltip");
+    const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
+    closeBtn.className = "stock-chart-tooltip-close";
+    closeBtn.setAttribute("aria-label", "Close tooltip");
+    closeBtn.innerHTML =
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 18 18" width="12" height="12" aria-hidden="true">' +
+      '<circle cx="9" cy="9" r="7.25" fill="none" stroke="currentColor" stroke-width="1.25"/>' +
+      '<path d="M6 6l6 6M12 6l-6 6" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round"/>' +
+      "</svg>";
+    closeBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      closeStockChartHtmlTooltip();
+    });
+    el.appendChild(closeBtn);
     wrap.appendChild(el);
   }
 
@@ -396,12 +426,24 @@ function stockChartExternalTooltip(context) {
     return;
   }
 
-  el.textContent = "";
+  const hasGraphArticle = active.some((a) => {
+    const ds = chart.data.datasets[a.datasetIndex];
+    return ds && ds.label === KG_SCATTER_LABEL;
+  });
+  el.classList.toggle("stock-chart-html-tooltip--compact", !hasGraphArticle);
+
+  el.querySelector(".stock-chart-tooltip-title")?.remove();
+  el.querySelector(".stock-chart-tooltip-body")?.remove();
+
   const titleLines = tooltip.title || [];
   const titleDiv = document.createElement("div");
   titleDiv.className = "stock-chart-tooltip-title";
   titleDiv.textContent = titleLines.join("\n");
   el.appendChild(titleDiv);
+
+  const body = document.createElement("div");
+  body.className = "stock-chart-tooltip-body";
+  el.appendChild(body);
 
   for (const a of active) {
     const ds = chart.data.datasets[a.datasetIndex];
@@ -414,12 +456,12 @@ function stockChartExternalTooltip(context) {
       const headline = document.createElement("div");
       headline.className = "stock-chart-tooltip-headline";
       headline.textContent = (meta.headline || "—").slice(0, 140);
-      el.appendChild(headline);
+      body.appendChild(headline);
       if (meta.sentiment != null && !Number.isNaN(Number(meta.sentiment))) {
         const sent = document.createElement("div");
         sent.className = "stock-chart-tooltip-meta";
         sent.textContent = `Sentiment ${Number(meta.sentiment).toFixed(2)}`;
-        el.appendChild(sent);
+        body.appendChild(sent);
       }
       const href = safeArticleHref(meta.url);
       if (href) {
@@ -429,7 +471,7 @@ function stockChartExternalTooltip(context) {
         link.target = "_blank";
         link.rel = "noopener noreferrer";
         link.textContent = truncateUrlForDisplay(href, 76);
-        el.appendChild(link);
+        body.appendChild(link);
       }
     } else {
       const rawVal = ds.data[idx];
@@ -437,7 +479,7 @@ function stockChartExternalTooltip(context) {
       const row = document.createElement("div");
       row.className = "stock-chart-tooltip-row";
       row.textContent = `${ds.label}: ${formatUsd(y)}`;
-      el.appendChild(row);
+      body.appendChild(row);
     }
   }
 
