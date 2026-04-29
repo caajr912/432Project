@@ -615,6 +615,17 @@ h3{
     line-height:1.4;
 }
 
+a.news-title-link{
+    display:block;
+    text-decoration:none;
+    color:inherit;
+}
+
+a.news-title-link:hover{
+    text-decoration:underline;
+    color:#66ffe6;
+}
+
 .news-date{
     margin:0;
     font-size:12px;
