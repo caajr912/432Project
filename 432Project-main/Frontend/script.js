@@ -938,7 +938,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 async function getStock() {
   const raw = document.getElementById("ticker").value.trim().toUpperCase();
-  const ticker = raw.replace(/[^A-Z0-9.-]/g, "");
+  const ticker = raw.replace(/[^A-Z0-9.^-]/g, "");
   if (!ticker) {
     document.getElementById("price").innerText = "Enter a symbol";
     return;
@@ -1355,25 +1355,54 @@ function renderSectorHeatmap() {
   }
 }
 
+const MARKET_INDEX_SYMBOLS = ["^DJI", "^GSPC", "^IXIC"];
+
 async function fetchMarkets() {
   try {
-    const tickerList = await fetch(`${API_BASE}/api/tickers`).then(r => r.ok ? r.json() : []);
+    // Fetch index prices and stock ticker list in parallel
+    const [tickerList, indexPriceResults] = await Promise.all([
+      fetch(`${API_BASE}/api/tickers`).then(r => r.ok ? r.json() : []),
+      Promise.all(
+        MARKET_INDEX_SYMBOLS.map(sym =>
+          fetch(`${API_BASE}/api/prices/${encodeURIComponent(sym)}?days=10`)
+            .then(r => r.ok ? r.json() : null)
+            .catch(() => null)
+        )
+      ),
+    ]);
 
-    // Fetch recent prices per ticker — 10 days covers weekends and holidays
+    // Build index cards from the 3 hardcoded market indices
+    const displayIndices = MARKET_INDEX_SYMBOLS.map((sym, i) => {
+      const data = indexPriceResults[i];
+      if (!data || !Array.isArray(data.prices) || data.prices.length === 0)
+        return { symbol: sym, price: null, changePercent: null, change: null };
+      const latest = data.prices[data.prices.length - 1];
+      return {
+        symbol: sym,
+        price: latest.close,
+        changePercent: latest.pct_change ?? null,
+        change: latest.pct_change != null && latest.close != null
+          ? parseFloat((latest.close * latest.pct_change / 100).toFixed(2))
+          : null,
+      };
+    });
+
+    // Fetch recent prices for individual stocks (exclude index tickers)
+    const stockList = tickerList.filter(sym => !sym.startsWith("^"));
     const priceResults = await Promise.all(
-      tickerList.map(sym =>
+      stockList.map(sym =>
         fetch(`${API_BASE}/api/prices/${encodeURIComponent(sym)}?days=10`)
           .then(r => r.ok ? r.json() : null)
           .catch(() => null)
       )
     );
 
-    const allItems = [];
-    tickerList.forEach((sym, i) => {
+    const stocks = [];
+    stockList.forEach((sym, i) => {
       const data = priceResults[i];
       if (!data || !Array.isArray(data.prices) || data.prices.length === 0) return;
       const latest = data.prices[data.prices.length - 1];
-      allItems.push({
+      stocks.push({
         symbol: sym,
         price: latest.close,
         changePercent: latest.pct_change ?? null,
@@ -1383,12 +1412,7 @@ async function fetchMarkets() {
       });
     });
 
-    // Separate index tickers (start with ^) from regular stocks
-    const indices = allItems.filter(it => it.symbol.startsWith("^"));
-    const stocks = allItems.filter(it => !it.symbol.startsWith("^"));
-    const displayIndices = indices.length > 0 ? indices : allItems.slice(0, 4);
-
-    const sortedStocks = [...(stocks.length > 0 ? stocks : allItems)]
+    const sortedStocks = [...stocks]
       .sort((a, b) => (b.changePercent ?? -Infinity) - (a.changePercent ?? -Infinity));
     const movers = {
       gainers: sortedStocks.slice(0, 5),
