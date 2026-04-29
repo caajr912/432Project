@@ -190,6 +190,19 @@ function newsDate(ts) {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
+function articleHref(url) {
+  if (url == null || typeof url !== "string") return null;
+  const u = url.trim();
+  if (!u) return null;
+  try {
+    const parsed = new URL(u);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+    return u;
+  } catch {
+    return null;
+  }
+}
+
 function chartTimestamp(ts) {
   if (ts == null) return "Unknown time";
   const d = new Date(Number(ts) * 1000);
@@ -1220,13 +1233,25 @@ async function getStock() {
       items.forEach((article) => {
         const div = document.createElement("div");
         div.className = "newsCard";
-        const title = document.createElement("p");
-        title.className = "news-title";
-        title.textContent = article.headline || article.summary || "—";
+        const titleText = article.headline || article.summary || "—";
+        const href = articleHref(article.url);
+        if (href) {
+          const link = document.createElement("a");
+          link.className = "news-title news-title-link";
+          link.href = href;
+          link.target = "_blank";
+          link.rel = "noopener noreferrer";
+          link.textContent = titleText;
+          div.appendChild(link);
+        } else {
+          const title = document.createElement("p");
+          title.className = "news-title";
+          title.textContent = titleText;
+          div.appendChild(title);
+        }
         const dateEl = document.createElement("p");
         dateEl.className = "news-date";
         dateEl.textContent = newsDate(article.datetime || article.published_date);
-        div.appendChild(title);
         div.appendChild(dateEl);
         newsList.appendChild(div);
       });
