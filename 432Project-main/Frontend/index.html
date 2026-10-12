@@ -5,7 +5,7 @@
 
 <meta charset="UTF-8">
 
-<title>Finance Insights</title>
+<title>StockSense</title>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
@@ -24,7 +24,7 @@
         <a href="#" class="nav-link active" id="navHome" onclick="showView('home')">Home</a>
         <a href="#" class="nav-link" id="navMarkets" onclick="showView('markets')">Markets</a>
         <a href="#" class="nav-link" id="navResearch" onclick="showView('research')">Research</a>
-        <a href="#" class="nav-link" id="navPortfolio" onclick="showView('portfolio')">Portfolio</a>
+        <a href="news.html" class="nav-link" id="navNews">News</a>
     </div>
 </nav>
 
@@ -42,23 +42,30 @@
                 <rect x="20" y="4" width="6" height="26" rx="1" fill="#93c5fd"/>
             </svg>
             <div class="logo-text">
-                <span class="logo-top">FINANCE</span>
-                <span class="logo-bottom">INSIGHTS</span>
+                <span class="logo-top">Stock</span>
+                <span class="logo-bottom">Sense</span>
             </div>
         </div>
         <div class="search-box">
             <select id="tickerSelect" class="ticker-select" aria-label="Pick a stock" onchange="onTickerSelect()">
                 <option value="">Pick a stock…</option>
-                <option value="AAPL">Apple (AAPL)</option>
-                <option value="MSFT">Microsoft (MSFT)</option>
-                <option value="GOOGL">Alphabet (GOOGL)</option>
-                <option value="AMZN">Amazon (AMZN)</option>
-                <option value="META">Meta (META)</option>
-                <option value="NVDA">NVIDIA (NVDA)</option>
-                <option value="TSLA">Tesla (TSLA)</option>
-                <option value="JPM">JPMorgan (JPM)</option>
-                <option value="JNJ">Johnson &amp; Johnson (JNJ)</option>
-                <option value="XOM">Exxon Mobil (XOM)</option>
+                <optgroup label="Market Indices">
+                    <option value="^DJI">Dow Jones (^DJI)</option>
+                    <option value="^GSPC">S&amp;P 500 (^GSPC)</option>
+                    <option value="^IXIC">Nasdaq (^IXIC)</option>
+                </optgroup>
+                <optgroup label="Stocks">
+                    <option value="AAPL">Apple (AAPL)</option>
+                    <option value="MSFT">Microsoft (MSFT)</option>
+                    <option value="GOOGL">Alphabet (GOOGL)</option>
+                    <option value="AMZN">Amazon (AMZN)</option>
+                    <option value="META">Meta (META)</option>
+                    <option value="NVDA">NVIDIA (NVDA)</option>
+                    <option value="TSLA">Tesla (TSLA)</option>
+                    <option value="JPM">JPMorgan (JPM)</option>
+                    <option value="JNJ">Johnson &amp; Johnson (JNJ)</option>
+                    <option value="XOM">Exxon Mobil (XOM)</option>
+                </optgroup>
             </select>
             <div class="search-input-wrap">
                 <input id="ticker" placeholder="Or type a symbol" autocomplete="off">
@@ -130,7 +137,7 @@
     <div class="info-card info-card-capped">
         <div class="news-header">
             <h3>Latest News</h3>
-            <a href="#" class="see-all">See all</a>
+            <a href="news.html" class="see-all">See all</a>
         </div>
         <div class="info-card-scroll-body">
             <div id="newsList"></div>

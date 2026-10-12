@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>All News — Finance Insights</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:,">
+</head>
+
+<body>
+
+  <nav class="topnav">
+    <div class="topnav-links">
+      <a href="index.html" class="nav-link">Home</a>
+      <a href="index.html" class="nav-link">Markets</a>
+      <a href="index.html" class="nav-link">Research</a>
+      <a href="news.html" class="nav-link active">News</a>
+    </div>
+  </nav>
+
+  <div class="container news-page-container">
+    <div class="main-card news-page-card">
+      <div class="header-row news-page-header-row">
+        <div>
+          <h1 class="news-page-title">All news</h1>
+          <p class="news-page-subtitle">Headlines from the knowledge graph, newest first.</p>
+        </div>
+        <a href="index.html" class="news-page-back">← Back to dashboard</a>
+      </div>
+      <p id="newsPageStatus" class="news-page-status" aria-live="polite">Loading…</p>
+      <div id="newsPageList" class="news-page-list"></div>
+    </div>
+  </div>
+
+  <script src="news-page.js"></script>
+</body>
+
+</html>
