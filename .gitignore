@@ -25,3 +25,8 @@ __pycache__/
 # Editor
 .idea/
 .vscode/
+data/
+__pycache__/
+*.pyc
+*.tmp
+.vscode/
